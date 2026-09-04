@@ -4,7 +4,7 @@
 **Synergy** é um hub de engajamento e gestão para equipes de desenvolvimento de software operando em modelo remoto. A plataforma combina práticas do **Management 3.0** com mecanismos de **Gamificação** para transformar o alinhamento de metas, o acompanhamento de progresso e a cultura do time em uma experiência dinâmica, clara e motivadora.
 
 * **Problema:** Times remotos enfrentam desconexão interpessoal, falta de visibilidade sobre conquistas e baixa motivação em processos tradicionais de gestão.
-* **Solução:** Uma plataforma centralizada onde gestores orquestram dinâmicas colaborativas, mantêm visibilidade de métricas humanas e recompensam o atingimento de metas com elementos lúdicos.
+* **Solução:** Uma plataforma centralizada onde gestores orquestram dinâmicas colaborativas, mantêm visibilidade de métricas humanas e recompensam o atingimento de metas com elementos lúdicos. 
 
 ---
 
@@ -73,7 +73,7 @@ model User {
   id          String       @id @default(uuid())
   name        String
   email       String       @unique
-  hobby       String       @unique
+  hobby       String       
   globalRole  GlobalRole   @default(USER)
   xp          Int          @default(0)
   level       Int          @default(1)
