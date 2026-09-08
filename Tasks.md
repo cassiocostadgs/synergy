@@ -2,6 +2,8 @@
 
 > Gerado a partir de `PRD.md`, `CLAUDE.md` e `DESIGN-SYSTEM.md` (2026-09-08).
 > Escopo: apenas o que está concretamente especificado hoje (RBAC + Épico 3.1 — Gestão de Times e Membros + App Shell). Ver [⚠️ Pontos em aberto no PRD](#️-pontos-em-aberto-no-prd-resolver-antes-ou-durante-o-mvp) antes de estimar o restante do MVP.
+>
+> **Decisão técnica confirmada (2026-09-08):** banco de dados = **PostgreSQL** (via `pgx`/GORM, conforme `CLAUDE.md`).
 
 ---
 
@@ -11,7 +13,7 @@
 - [ ] Inicializar módulo Go (`go mod init`) e estrutura `cmd/api/main.go`
 - [ ] Criar esqueleto de camadas em `internal/`: `domain/`, `usecase/`, `repository/`, `handler/`
 - [ ] Configurar servidor HTTP (router, middlewares de log e recovery)
-- [ ] Configurar conexão com banco (pgx/GORM) via variáveis de ambiente
+- [ ] Configurar conexão com **PostgreSQL** (pgx/GORM) via variáveis de ambiente
 - [ ] Configurar sistema de migrations (ex: `golang-migrate` ou `atlas`)
 - [ ] Middleware de autenticação (JWT) e middleware de autorização por `Role`
 - [ ] Padronizar formato de erro/response HTTP (envelope de DTO)
