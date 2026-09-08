@@ -12,7 +12,7 @@ synergy/
 │   │   └── internal/         # Código privado do app (Arquitetura em Camadas)
 │   │       ├── domain/       # Entidades do negócio e interfaces (sem dependências externas)
 │   │       ├── usecase/      # Regras de negócio e casos de uso
-│   │       ├── repository/   # Implementação de banco de dados (SQL, GORM, pgx)
+│   │       ├── repository/   # Implementação de banco de dados (PostgreSQL via GORM/pgx)
 │   │       └── handler/      # Camada HTTP (Controllers/Handlers e DTOs)
 │   │
 │   └── web/                  # Frontend em React (Vite + TypeScript)

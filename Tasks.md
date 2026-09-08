@@ -113,7 +113,13 @@
 1. **Papéis divergentes:** a matriz RBAC (seção 2) lista só `Admin`, `Gestor`, `Colaborador`, mas o enum `Role` (seção 4) inclui `AUDITOR`. Precisa decidir se Auditor entra no MVP e quais suas permissões.
 2. **Modelo de dados incompleto para o próprio épico do MVP:** a seção 4 só define `User` e `Profile`; não há `Team`/`TeamMember`, indispensáveis para a seção 3.1. Assumi um modelo mínimo acima — validar com o time antes de implementar.
 3. **Épicos prometidos e não escritos:** o título da seção 3 é "Módulos e Funcionalidades (**Épicos**)" no plural, mas só o 3.1 existe. O Design System já pressupõe telas de Dashboard/KPIs e "Behavioral Insights" (seção 4.1–4.2) que não têm nenhuma regra de negócio ou funcionalidade descrita no PRD — não incluí tarefas de implementação de dados para eles, só o componente visual genérico (KPI Card), para não inventar escopo.
-4. **Gamificação:** o Overview cita "mecanismos de Gamificação" e o `Profile` já tem `xp`/`level`, mas não há regra de como XP é ganho, o que dispara level up, nem o que são as "dinâmicas" (Gestor "inicia dinâmicas" — seção 2). Isso é provavelmente um épico próprio ainda não escrito.
-5. **Metas:** Gestores "criam/avaliam metas" e Colaboradores "gerenciam suas metas" (seção 2), mas não há épico, modelo de dados nem tela para Metas no PRD atual.
 
-Recomendo tratar os itens 3–5 como próximos épicos a especificar no PRD antes de virarem tasks — do jeito que está, qualquer tarefa para eles seria suposição minha, não requisito do produto.
+> **Descope confirmado (2026-09-08):** uma versão anterior do PRD (commit `a644303`) já continha modelos de `Goal` (Metas) e `Dynamic` (Kudo Box, Niko Niko, Personal Map, Moving Motivators) e a seção "3.3 Dinâmicas Management 3.0". A simplificação do PRD para a versão atual (sem esses modelos) foi **confirmada como decisão intencional de produto** para o MVP — Metas e Dinâmicas ficam fora de escopo por ora, não são lacunas a preencher. Se forem retomados depois, o histórico do git (`git show a644303:PRD.md`) tem um ponto de partida já modelado.
+
+Recomendo tratar o item 3 (Dashboard/Behavioral Insights) como próximo épico a especificar no PRD antes de virar tasks — do jeito que está, qualquer tarefa para ele seria suposição minha, não requisito do produto.
+
+---
+
+## 🛠️ Nota de infraestrutura (fora do escopo de produto)
+
+Foram detectados **2 commits no repositório que não foram feitos por mim** durante esta sessão (`096dc94`, `1556935`). Isso sugere algum auto-commit (extensão do VS Code, hook de git, etc.) rodando no ambiente. Vale revisar as configurações do editor/repositório para confirmar se isso é intencional — commits automáticos podem gravar estados intermediários sem revisão.

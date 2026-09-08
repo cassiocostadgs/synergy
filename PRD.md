@@ -34,6 +34,8 @@ O sistema conta com 4 perfis de usuários com escopos de ação específicos:
 
 ## 4. Estrutura de Dados Preliminar
 
+> **Banco de dados:** PostgreSQL (acessado via GORM/pgx no backend, conforme `CLAUDE.md`).
+
 
 enum Role {
   ADMIN
