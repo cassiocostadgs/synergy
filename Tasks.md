@@ -1,9 +1,13 @@
 # ✅ tasks.md — Synergy MVP
 
 > Gerado a partir de `PRD.md`, `CLAUDE.md` e `DESIGN-SYSTEM.md` (2026-09-08).
-> Escopo: apenas o que está concretamente especificado hoje (RBAC + Épico 3.1 — Gestão de Times e Membros + App Shell). Ver [⚠️ Pontos em aberto no PRD](#️-pontos-em-aberto-no-prd-resolver-antes-ou-durante-o-mvp) antes de estimar o restante do MVP.
+> Escopo: apenas o que está concretamente especificado hoje (RBAC + Épico 3.1 — Gestão de Times e Membros + App Shell). Todos os pontos em aberto foram resolvidos em 2026-09-08 — ver [📌 Decisões de Escopo Confirmadas](#-decisões-de-escopo-confirmadas-2026-09-08).
 >
-> **Decisão técnica confirmada (2026-09-08):** banco de dados = **PostgreSQL** (via `pgx`/GORM, conforme `CLAUDE.md`).
+> **Decisões técnicas confirmadas (2026-09-08):**
+> - Banco de dados = **PostgreSQL** (via `pgx`/GORM, conforme `CLAUDE.md`).
+> - Modelo `Team`/`TeamMember` formalizado no `PRD.md` (seção 4).
+> - Papel **Auditor** fica fora do MVP (reservado no enum, sem regras de permissão).
+> - Épico **Dashboard/Behavioral Insights** fica pós-MVP (só o componente visual genérico de KPI Card entra agora).
 
 ---
 
@@ -39,9 +43,9 @@
 
 - [ ] Modelar entidade `User` (id, name, email, role, timestamps)
 - [ ] Modelar entidade `Profile` (userId, hobby, xp, level) — 1:1 com `User`
-- [ ] Modelar entidades `Team` e `TeamMember` (necessárias para o Épico 3.1, ausentes no PRD — ver pontos em aberto)
-  - `Team`: id, nome, status (ativo/arquivado), timestamps
-  - `TeamMember`: teamId, userId, papel-no-time (Gestor Principal / Gestor de Apoio / Colaborador)
+- [ ] Modelar entidades `Team` e `TeamMember` (formalizadas no `PRD.md`, seção 4)
+  - `Team`: id, nome, `status` (`TeamStatus`: ACTIVE/ARCHIVED), timestamps
+  - `TeamMember`: teamId, userId, `role` (`TeamRole`: GESTOR_PRINCIPAL/GESTOR_APOIO/COLABORADOR)
 - [ ] Migrations correspondentes
 - [ ] Endpoint de login/autenticação (emissão de JWT)
 - [ ] Seed inicial (usuário Admin) para bootstrap do sistema
@@ -50,7 +54,7 @@
 
 ## Fase 2 — RBAC (Admin / Gestor / Colaborador)
 
-- [ ] Definir enum `Role` no domínio (alinhar com decisão sobre `AUDITOR` — ver pontos em aberto)
+- [ ] Definir enum `Role` no domínio com os 4 valores do PRD (`ADMIN`, `GESTOR`, `COLABORADOR`, `AUDITOR`), mas implementar regras de autorização **apenas** para os 3 primeiros — `AUDITOR` fica reservado, fora do MVP
 - [ ] Usecase de checagem de permissão por papel e por escopo (ex: Gestor só age no próprio time)
 - [ ] Handler + middleware para proteger rotas por papel
 - [ ] Frontend: guard de rotas (`RequireRole`) e ocultação condicional de ações na UI conforme papel
@@ -81,7 +85,7 @@
 - [ ] `ui/`: formulário de criação/edição de time
 - [ ] `ui/`: painel de membros do time (tabela — ver padrão 4.3 do Design System)
   - [ ] Ações: adicionar, alterar papel, remover membro
-  - [ ] Badges de papel (Gestor Principal / Apoio / Colaborador) e status
+  - [ ] Badges de papel (`GESTOR_PRINCIPAL` / `GESTOR_APOIO` / `COLABORADOR`) e status do time (`ACTIVE`/`ARCHIVED`)
 - [ ] Validações de formulário espelhando RN1/RN2 (feedback antes do submit)
 
 ---
@@ -108,15 +112,16 @@
 
 ---
 
-## ⚠️ Pontos em aberto no PRD (resolver antes ou durante o MVP)
+## 📌 Decisões de Escopo Confirmadas (2026-09-08)
 
-1. **Papéis divergentes:** a matriz RBAC (seção 2) lista só `Admin`, `Gestor`, `Colaborador`, mas o enum `Role` (seção 4) inclui `AUDITOR`. Precisa decidir se Auditor entra no MVP e quais suas permissões.
-2. **Modelo de dados incompleto para o próprio épico do MVP:** a seção 4 só define `User` e `Profile`; não há `Team`/`TeamMember`, indispensáveis para a seção 3.1. Assumi um modelo mínimo acima — validar com o time antes de implementar.
-3. **Épicos prometidos e não escritos:** o título da seção 3 é "Módulos e Funcionalidades (**Épicos**)" no plural, mas só o 3.1 existe. O Design System já pressupõe telas de Dashboard/KPIs e "Behavioral Insights" (seção 4.1–4.2) que não têm nenhuma regra de negócio ou funcionalidade descrita no PRD — não incluí tarefas de implementação de dados para eles, só o componente visual genérico (KPI Card), para não inventar escopo.
+Todos os pontos que estavam em aberto na primeira versão deste documento foram decididos com o time de produto:
 
-> **Descope confirmado (2026-09-08):** uma versão anterior do PRD (commit `a644303`) já continha modelos de `Goal` (Metas) e `Dynamic` (Kudo Box, Niko Niko, Personal Map, Moving Motivators) e a seção "3.3 Dinâmicas Management 3.0". A simplificação do PRD para a versão atual (sem esses modelos) foi **confirmada como decisão intencional de produto** para o MVP — Metas e Dinâmicas ficam fora de escopo por ora, não são lacunas a preencher. Se forem retomados depois, o histórico do git (`git show a644303:PRD.md`) tem um ponto de partida já modelado.
+1. **Papel Auditor → fora do MVP.** O enum `Role` mantém o valor `AUDITOR` (reservado para fase futura), mas nenhuma regra de permissão é implementada para ele agora. Registrado no `PRD.md`, seção 2.
+2. **Modelo `Team`/`TeamMember` → formalizado.** Ficou definido com `TeamRole` (`GESTOR_PRINCIPAL`/`GESTOR_APOIO`/`COLABORADOR`) e `TeamStatus` (`ACTIVE`/`ARCHIVED`), incorporado ao `PRD.md`, seção 4.
+3. **Épico Dashboard/Behavioral Insights → pós-MVP.** O `DESIGN-SYSTEM.md` já desenha esses componentes, mas nenhuma regra de negócio real entra neste MVP; apenas o componente visual genérico de KPI Card é construído (Fase 4), sem dado de produto por trás. Registrado no `PRD.md`, seção 5 ("Fora do Escopo do MVP").
+4. **Metas (Goal) e Dinâmicas Management 3.0 → pós-MVP** (decisão já confirmada anteriormente). Existiam numa versão anterior do PRD (commit `a644303`: `git show a644303:PRD.md`) e podem servir de ponto de partida quando esses épicos forem retomados. Registrado no `PRD.md`, seção 5.
 
-Recomendo tratar o item 3 (Dashboard/Behavioral Insights) como próximo épico a especificar no PRD antes de virar tasks — do jeito que está, qualquer tarefa para ele seria suposição minha, não requisito do produto.
+Não há mais pontos em aberto bloqueando o início da implementação das Fases 0–5 acima.
 
 ---
 
