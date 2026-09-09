@@ -275,6 +275,24 @@ func (r *TeamMemberRepository) TransferPrincipal(ctx context.Context, teamID, fr
 	return tx.Commit(ctx)
 }
 
+func (r *TeamMemberRepository) LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error) {
+	var lidera bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM team_members tm
+			JOIN teams t ON t.id = tm.team_id
+			WHERE tm.user_id = $1
+			  AND tm.role = 'GESTOR_PRINCIPAL'::team_role
+			  AND t.status = 'ACTIVE'::team_status
+		)`, userID,
+	).Scan(&lidera)
+	if err != nil {
+		return false, err
+	}
+	return lidera, nil
+}
+
 func scanMember(row scanner) (*domain.TeamMember, error) {
 	var (
 		member domain.TeamMember

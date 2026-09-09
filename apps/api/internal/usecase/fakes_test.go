@@ -82,6 +82,15 @@ func (r fakeUserRepo) UpdatePassword(_ context.Context, id uuid.UUID, passwordHa
 	return nil
 }
 
+func (r fakeUserRepo) UpdateStatus(_ context.Context, id uuid.UUID, status domain.UserStatus) error {
+	user, ok := r.store.users[id]
+	if !ok {
+		return domain.NotFound("usuário não encontrado")
+	}
+	user.Status = status
+	return nil
+}
+
 func (r fakeUserRepo) List(_ context.Context) ([]domain.User, error) {
 	out := make([]domain.User, 0, len(r.store.users))
 	for _, user := range r.store.users {
@@ -234,6 +243,18 @@ func (r fakeMemberRepo) Remove(_ context.Context, teamID, userID uuid.UUID) erro
 	return domain.NotFound("membro não encontrado")
 }
 
+func (r fakeMemberRepo) LeadsActiveTeam(_ context.Context, userID uuid.UUID) (bool, error) {
+	for _, member := range r.store.members {
+		if member.UserID != userID || member.Role != domain.TeamRoleGestorPrincipal {
+			continue
+		}
+		if team, ok := r.store.teams[member.TeamID]; ok && !team.IsArchived() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r fakeMemberRepo) TransferPrincipal(ctx context.Context, teamID, fromUserID, toUserID uuid.UUID) error {
 	if err := r.UpdateRole(ctx, teamID, fromUserID, domain.TeamRoleColaborador); err != nil {
 		return err
@@ -263,7 +284,7 @@ func newHarness(t *testing.T) *harness {
 		t:       t,
 		store:   store,
 		teams:   NewTeamUseCase(teams, members, users),
-		auth:    NewAuthUseCase(users, profiles, stubHasher{}, stubTokens{}),
+		auth:    NewAuthUseCase(users, profiles, members, stubHasher{}, stubTokens{}),
 		members: members,
 	}
 }
@@ -293,6 +314,7 @@ func (h *harness) newUserComSenha(name string, role domain.Role, senha string) d
 		Email:        strings.ToLower(name) + "@synergy.dev",
 		PasswordHash: hash,
 		Role:         role,
+		Status:       domain.UserStatusActive,
 	}
 	h.store.profiles[id] = &domain.Profile{
 		ID:     uuid.New(),

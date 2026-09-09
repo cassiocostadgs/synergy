@@ -82,6 +82,22 @@ do próprio cadastro sem depender do Admin.
 * **Limitação conhecida:** trocar a senha **não invalida os tokens já emitidos**; eles seguem válidos até expirar. Revogar sessões exigiria lista de bloqueio ou versionamento de credencial.
 * **Fora de escopo:** recuperação de senha por e-mail ("esqueci minha senha") e reset de senha de terceiros pelo Admin. Sem isso, um usuário que perca a senha depende de intervenção direta no banco.
 
+### 3.4. Inativação de Acessos
+
+Exclusivo do **Admin**, na tela de Usuários. Inativar **não exclui**: o vínculo com os
+times permanece, preservando o histórico de participação que um `DELETE` destruiria.
+
+* **Funcionalidades:**
+  * Inativar e reativar o acesso de qualquer usuário.
+  * A listagem mostra a situação de cada um, esmaece os inativos e os joga para o fim da lista.
+* **Regras de Negócio:**
+  * O usuário inativo **não autentica** e **perde o acesso imediatamente** — a sessão já aberta deixa de valer na requisição seguinte, sem esperar o token expirar.
+  * O Admin **não pode inativar o próprio acesso** (se trancaria fora do sistema).
+  * Não é possível inativar quem é **Gestor Principal de um time ativo**: a liderança precisa ser transferida antes, senão o time ficaria liderado por alguém sem acesso. Líder de time **arquivado** pode ser inativado.
+  * Contrapartida: um usuário inativo **não pode ser adicionado a um time** nem designado Gestor Principal ou de Apoio.
+  * O vínculo com os times é preservado na inativação e volta a valer na reativação.
+* **Custo assumido:** para a inativação valer na hora, cada requisição autenticada passou a fazer uma leitura do usuário por chave primária. Antes o papel vinha apenas do JWT, sem consultar o banco.
+
 ---
 
 ## 4. Estrutura de Dados Preliminar
@@ -99,13 +115,19 @@ enum Role {
   AUDITOR
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
-  id        String   @id @default(uuid())
+  id        String     @id @default(uuid())
   name      String
-  email     String   @unique
-  role      Role     @default(COLABORADOR)
+  email     String     @unique
+  role      Role       @default(COLABORADOR)
+  status    UserStatus @default(ACTIVE)
   profile   Profile?
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
 }
 
 model Profile {

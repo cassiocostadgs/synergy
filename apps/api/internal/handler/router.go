@@ -15,6 +15,7 @@ type RouterConfig struct {
 	Auth           *usecase.AuthUseCase
 	Teams          *usecase.TeamUseCase
 	TokenParser    TokenParser
+	Sessions       SessionValidator
 	Logger         *slog.Logger
 	AllowedOrigins []string
 }
@@ -66,7 +67,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 		// Rotas autenticadas
 		api.Group(func(protected chi.Router) {
-			protected.Use(RequireAuth(cfg.TokenParser))
+			protected.Use(RequireAuth(cfg.TokenParser, cfg.Sessions))
 
 			// Autogestão do próprio cadastro: qualquer papel autenticado.
 			protected.Get("/me", authHandler.Me)
@@ -79,6 +80,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				Post("/users", authHandler.CreateUser)
 			protected.With(RequireRole(domain.RoleAdmin, domain.RoleGestor)).
 				Get("/users", authHandler.ListUsers)
+			protected.With(RequireRole(domain.RoleAdmin)).
+				Patch("/users/{userId}/status", authHandler.SetUserStatus)
 
 			protected.Route("/teams", func(teams chi.Router) {
 				teams.Get("/", teamHandler.List)

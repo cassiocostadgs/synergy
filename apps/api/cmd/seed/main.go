@@ -77,6 +77,7 @@ func run(logger *slog.Logger) error {
 		Email:        email,
 		PasswordHash: hash,
 		Role:         domain.RoleAdmin,
+		Status:       domain.UserStatusActive,
 		CreatedAt:    time.Now().UTC(),
 	}
 	profile := &domain.Profile{

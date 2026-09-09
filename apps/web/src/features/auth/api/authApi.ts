@@ -1,5 +1,5 @@
 import { apiFetch } from '@/services/httpClient'
-import type { LoginResult, Me, Role, User } from '@/types'
+import type { LoginResult, Me, Role, User, UserStatus } from '@/types'
 
 export interface CreateUserInput {
   name: string
@@ -36,4 +36,8 @@ export const authApi = {
   /** Cadastro de usuários é exclusivo do Admin (PRD seção 2). */
   createUser: (input: CreateUserInput) =>
     apiFetch<User>('/users', { method: 'POST', body: input }),
+
+  /** Ativa ou inativa um acesso. Exclusivo do Admin (PRD seção 3.4). */
+  setUserStatus: (userId: string, status: UserStatus) =>
+    apiFetch<User>(`/users/${userId}/status`, { method: 'PATCH', body: { status } }),
 }

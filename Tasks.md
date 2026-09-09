@@ -169,6 +169,29 @@ aderência, é removida. Por isso nasceu sem persistência — a remoção não 
 
 ---
 
+## Fase 4.3 — Inativação de Acessos (PRD seção 3.4)
+
+- [x] Migration `0002_user_status`: enum `user_status`, coluna `status` com default `ACTIVE` e índice
+- [x] `domain`: `UserStatus`, `User.Status`, `User.IsActive()`, `UpdateStatus` e `LeadsActiveTeam`
+- [x] `repository`: implementação PostgreSQL, com listagem ordenando ativos primeiro
+- [x] `usecase.SetUserStatus` — restrito ao Admin, com as guardas:
+  - [x] Admin não inativa o próprio acesso
+  - [x] não inativa Gestor Principal de time **ativo** (líder de time arquivado pode)
+  - [x] usuário inativo não entra em time nem lidera (contrapartida em `AddMember` e `assertCanBePrincipal`)
+  - [x] vínculos com times preservados na inativação
+- [x] **Revogação imediata:** `EnsureActive` é consultado pelo middleware em cada requisição autenticada — o token já emitido para de valer na hora, sem esperar expirar
+- [x] `PATCH /api/v1/users/{userId}/status` (Admin) e `status` no DTO de usuário
+- [x] Frontend: coluna de situação, linhas de inativos esmaecidas, botões Inativar/Reativar com confirmação, contagem de inativos no subtítulo
+- [x] Frontend: usuários inativos filtrados dos seletores de membro e de Gestor Principal
+- [x] **10 testes unitários** novos (total do backend: **61**)
+
+### Decisão registrada
+O middleware passou a consultar o banco por requisição (leitura por chave primária). Era a
+alternativa a uma inativação que só surtiria efeito quando o token expirasse — para uma ação
+de segurança, atraso de horas equivale a não funcionar.
+
+---
+
 ## Fase 5 — QA e Fechamento do MVP
 
 - [x] Verificação de ponta a ponta da API contra PostgreSQL real (login, RBAC, CRUD de time,

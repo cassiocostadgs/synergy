@@ -203,6 +203,153 @@ func TestChangePassword_RejeitaNovaIgualAAtual(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Inativação de usuários
+// ---------------------------------------------------------------------------
+
+func TestSetUserStatus_ApenasAdmin(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Ana", domain.RoleGestor)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	_, err := h.auth.SetUserStatus(context.Background(), gestor, alvo.UserID, domain.UserStatusInactive)
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestSetUserStatus_InativaEBloqueiaOAcesso(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUserComSenha("Bruno", domain.RoleColaborador, "senha-forte-1")
+
+	user, err := h.auth.SetUserStatus(context.Background(), admin, alvo.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+	if user.Status != domain.UserStatusInactive {
+		t.Errorf("esperava INACTIVE, obtive %s", user.Status)
+	}
+
+	// Não consegue mais autenticar...
+	_, err = h.auth.Login(context.Background(), "bruno@synergy.dev", "senha-forte-1")
+	requireCode(t, err, domain.CodeForbidden)
+
+	// ...e a sessão que já tinha deixa de valer na próxima requisição.
+	requireCode(t, h.auth.EnsureActive(context.Background(), alvo), domain.CodeForbidden)
+}
+
+func TestSetUserStatus_ReativaERestauraOAcesso(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUserComSenha("Bruno", domain.RoleColaborador, "senha-forte-1")
+
+	_, err := h.auth.SetUserStatus(context.Background(), admin, alvo.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+	_, err = h.auth.SetUserStatus(context.Background(), admin, alvo.UserID, domain.UserStatusActive)
+	requireNoError(t, err)
+
+	_, err = h.auth.Login(context.Background(), "bruno@synergy.dev", "senha-forte-1")
+	requireNoError(t, err)
+	requireNoError(t, h.auth.EnsureActive(context.Background(), alvo))
+}
+
+func TestSetUserStatus_AdminNaoInativaASiMesmo(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+
+	// Sem esta guarda o Admin se trancaria fora do sistema.
+	_, err := h.auth.SetUserStatus(context.Background(), admin, admin.UserID, domain.UserStatusInactive)
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestSetUserStatus_NaoInativaGestorPrincipalDeTimeAtivo(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	h.newTeam("Squad Neon", gestor)
+
+	_, err := h.auth.SetUserStatus(context.Background(), admin, gestor.UserID, domain.UserStatusInactive)
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestSetUserStatus_InativaLiderDeTimeArquivado(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.teams.Archive(context.Background(), gestor, team.ID)
+	requireNoError(t, err)
+
+	// Time arquivado não precisa de liderança ativa.
+	_, err = h.auth.SetUserStatus(context.Background(), admin, gestor.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+}
+
+func TestSetUserStatus_InativaColaboradorSemMexerNoVinculo(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	membro := h.newUser("Bruno", domain.RoleColaborador)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.teams.AddMember(context.Background(), gestor, team.ID, membro.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	_, err = h.auth.SetUserStatus(context.Background(), admin, membro.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+
+	// Inativar preserva o histórico: o vínculo com o time continua existindo.
+	if got := h.roleOf(team.ID, membro.UserID); got != domain.TeamRoleColaborador {
+		t.Errorf("esperava vínculo preservado, obtive %q", got)
+	}
+}
+
+func TestSetUserStatus_InativoNaoPodeSerAdicionadoNemLiderar(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	inativo := h.newUser("Bruno", domain.RoleColaborador)
+	outroGestor := h.newUser("Diego", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.auth.SetUserStatus(context.Background(), admin, inativo.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+	_, err = h.auth.SetUserStatus(context.Background(), admin, outroGestor.UserID, domain.UserStatusInactive)
+	requireNoError(t, err)
+
+	// Contrapartida da inativação: sem acesso, não entra em time nem lidera.
+	_, err = h.teams.AddMember(context.Background(), gestor, team.ID, inativo.UserID, domain.TeamRoleColaborador)
+	requireCode(t, err, domain.CodeConflict)
+
+	_, err = h.teams.AddMember(context.Background(), gestor, team.ID, outroGestor.UserID, domain.TeamRoleGestorApoio)
+	requireCode(t, err, domain.CodeConflict)
+
+	_, err = h.teams.Create(context.Background(), admin, CreateTeamInput{
+		Name:            "Squad Fantasma",
+		PrincipalUserID: outroGestor.UserID,
+	})
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestSetUserStatus_RejeitaStatusInvalido(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	_, err := h.auth.SetUserStatus(context.Background(), admin, alvo.UserID, domain.UserStatus("SUMIU"))
+	requireCode(t, err, domain.CodeValidation)
+}
+
+func TestSetUserStatus_MesmoStatusEhNoOp(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	user, err := h.auth.SetUserStatus(context.Background(), admin, alvo.UserID, domain.UserStatusActive)
+	requireNoError(t, err)
+	if user.Status != domain.UserStatusActive {
+		t.Errorf("esperava ACTIVE, obtive %s", user.Status)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Cadastro pelo Admin
 // ---------------------------------------------------------------------------
 

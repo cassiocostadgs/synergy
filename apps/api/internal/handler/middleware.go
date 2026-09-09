@@ -21,6 +21,12 @@ type TokenParser interface {
 	Parse(raw string) (domain.Actor, error)
 }
 
+// SessionValidator confirma que a sessão ainda é utilizável — hoje isso
+// significa checar se o usuário continua ativo.
+type SessionValidator interface {
+	EnsureActive(ctx context.Context, actor domain.Actor) error
+}
+
 // ActorFrom recupera o ator autenticado do contexto da requisição.
 func ActorFrom(ctx context.Context) (domain.Actor, bool) {
 	actor, ok := ctx.Value(actorContextKey).(domain.Actor)
@@ -37,7 +43,11 @@ func requireActor(r *http.Request) (domain.Actor, error) {
 }
 
 // RequireAuth exige um Bearer token válido e injeta o ator no contexto.
-func RequireAuth(parser TokenParser) func(http.Handler) http.Handler {
+//
+// Além de validar o token, confirma no banco que o usuário continua ativo. Isso
+// custa uma leitura por requisição, e é o que faz a inativação de um acesso
+// valer imediatamente em vez de só quando o token expirar.
+func RequireAuth(parser TokenParser, sessions SessionValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -57,6 +67,11 @@ func RequireAuth(parser TokenParser) func(http.Handler) http.Handler {
 			// (PRD seção 5): nenhuma rota o considera autorizado.
 			if !actor.Role.ImplementedInMVP() {
 				respondError(w, domain.Forbidden("o papel %s não está habilitado neste MVP", actor.Role))
+				return
+			}
+
+			if err := sessions.EnsureActive(r.Context(), actor); err != nil {
+				respondError(w, err)
 				return
 			}
 

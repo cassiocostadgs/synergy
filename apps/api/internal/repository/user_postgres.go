@@ -27,10 +27,16 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User, profile 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	status := user.Status
+	if status == "" {
+		status = domain.UserStatusActive
+	}
+
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO users (id, name, email, password_hash, role, created_at)
-		VALUES ($1, $2, $3, $4, $5::user_role, $6)`,
-		user.ID, user.Name, user.Email, user.PasswordHash, string(user.Role), user.CreatedAt,
+		INSERT INTO users (id, name, email, password_hash, role, status, created_at)
+		VALUES ($1, $2, $3, $4, $5::user_role, $6::user_status, $7)`,
+		user.ID, user.Name, user.Email, user.PasswordHash,
+		string(user.Role), string(status), user.CreatedAt,
 	); err != nil {
 		return translate(err, "já existe um usuário com este e-mail")
 	}
@@ -70,7 +76,21 @@ func (r *UserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, p
 	return nil
 }
 
-const userColumns = `id, name, email, password_hash, role::text, created_at`
+func (r *UserRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, status domain.UserStatus) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET status = $2::user_status WHERE id = $1`,
+		userID, string(status),
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("usuário não encontrado")
+	}
+	return nil
+}
+
+const userColumns = `id, name, email, password_hash, role::text, status::text, created_at`
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return r.queryUser(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id)
@@ -81,7 +101,8 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 }
 
 func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
-	rows, err := r.pool.Query(ctx, `SELECT `+userColumns+` FROM users ORDER BY name`)
+	// Ativos primeiro; inativos vão para o fim da lista.
+	rows, err := r.pool.Query(ctx, `SELECT `+userColumns+` FROM users ORDER BY status, name`)
 	if err != nil {
 		return nil, err
 	}
@@ -113,13 +134,17 @@ type scanner interface {
 
 func scanUser(row scanner) (*domain.User, error) {
 	var (
-		user domain.User
-		role string
+		user   domain.User
+		role   string
+		status string
 	)
-	if err := row.Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &role, &user.CreatedAt); err != nil {
+	if err := row.Scan(
+		&user.ID, &user.Name, &user.Email, &user.PasswordHash, &role, &status, &user.CreatedAt,
+	); err != nil {
 		return nil, err
 	}
 	user.Role = domain.Role(role)
+	user.Status = domain.UserStatus(status)
 	return &user, nil
 }
 

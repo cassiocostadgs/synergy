@@ -11,6 +11,7 @@ import {
   PageHeader,
   Select,
   Spinner,
+  cx,
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -37,8 +38,30 @@ export function UsersPage() {
   const isAdmin = me?.user.role === 'ADMIN'
   const { data, loading, error, reload } = useResource<User[]>(authApi.listUsers)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [erroAcao, setErroAcao] = useState<string | null>(null)
+  const [emAndamento, setEmAndamento] = useState<string | null>(null)
 
   const users = data ?? []
+  const inativos = users.filter((user) => user.status === 'INACTIVE').length
+
+  async function alternarStatus(user: User) {
+    const inativando = user.status === 'ACTIVE'
+    const confirmacao = inativando
+      ? `Inativar o acesso de ${user.name}? A pessoa perde o acesso imediatamente, mas continua nos times de que participa.`
+      : `Reativar o acesso de ${user.name}?`
+    if (!confirm(confirmacao)) return
+
+    setErroAcao(null)
+    setEmAndamento(user.id)
+    try {
+      await authApi.setUserStatus(user.id, inativando ? 'INACTIVE' : 'ACTIVE')
+      await reload()
+    } catch (err) {
+      setErroAcao(err instanceof ApiError ? err.message : 'Não foi possível alterar o status')
+    } finally {
+      setEmAndamento(null)
+    }
+  }
 
   return (
     <>
@@ -46,7 +69,7 @@ export function UsersPage() {
         title="Usuários"
         subtitle={
           isAdmin
-            ? 'Cadastro e visão geral dos acessos'
+            ? `Cadastro e visão geral dos acessos${inativos > 0 ? ` · ${inativos} inativo${inativos > 1 ? 's' : ''}` : ''}`
             : 'Pessoas disponíveis para compor os seus times'
         }
         actions={
@@ -59,44 +82,88 @@ export function UsersPage() {
       />
 
       {error ? <ErrorBanner message={error} /> : null}
+      {erroAcao ? (
+        <div className="mb-4">
+          <ErrorBanner message={erroAcao} />
+        </div>
+      ) : null}
       {loading ? <Spinner /> : null}
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-outline text-[13px] tracking-[0.14em] text-content-muted uppercase">
                 <th className="px-5 py-3 font-semibold">Usuário</th>
                 <th className="px-5 py-3 font-semibold">Papel global</th>
+                <th className="px-5 py-3 font-semibold">Situação</th>
                 <th className="px-5 py-3 font-semibold">Desde</th>
+                {isAdmin ? <th className="px-5 py-3 text-right font-semibold">Ações</th> : null}
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-outline/60 transition-colors last:border-0 hover:bg-surface-container-high"
-                >
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        name={user.name}
-                        tone={user.role === 'ADMIN' ? 'primary' : 'secondary'}
-                      />
-                      <div>
-                        <p className="font-semibold text-content">{user.name}</p>
-                        <p className="text-xs text-content-muted">{user.email}</p>
+              {users.map((user) => {
+                const inativo = user.status === 'INACTIVE'
+                const ehVoceMesmo = user.id === me?.user.id
+
+                return (
+                  <tr
+                    key={user.id}
+                    className={cx(
+                      'border-b border-outline/60 transition-colors last:border-0 hover:bg-surface-container-high',
+                      // Inativos ficam esmaecidos para se distinguirem à primeira vista.
+                      inativo && 'opacity-55',
+                    )}
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          name={user.name}
+                          tone={user.role === 'ADMIN' ? 'primary' : 'secondary'}
+                        />
+                        <div>
+                          <p className="font-semibold text-content">{user.name}</p>
+                          <p className="text-xs text-content-muted">{user.email}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <Badge tone={ROLE_TONE[user.role]}>{ROLE_LABEL[user.role]}</Badge>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-content-muted">
-                    {new Date(user.createdAt).toLocaleDateString('pt-BR')}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tone={ROLE_TONE[user.role]}>{ROLE_LABEL[user.role]}</Badge>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge tone={inativo ? 'neutral' : 'success'}>
+                        {inativo ? 'Inativo' : 'Ativo'}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3 text-xs text-content-muted">
+                      {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    </td>
+                    {isAdmin ? (
+                      <td className="px-5 py-3">
+                        <div className="flex justify-end">
+                          {ehVoceMesmo ? (
+                            <span className="text-xs text-content-muted">Você</span>
+                          ) : (
+                            <Button
+                              variant={inativo ? 'secondary' : 'danger'}
+                              icon={inativo ? 'person_check' : 'person_off'}
+                              disabled={emAndamento === user.id}
+                              className="px-2.5 py-1 text-xs"
+                              onClick={() => void alternarStatus(user)}
+                            >
+                              {emAndamento === user.id
+                                ? 'Aguarde…'
+                                : inativo
+                                  ? 'Reativar'
+                                  : 'Inativar'}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -6,11 +6,15 @@ export type TeamRole = 'GESTOR_PRINCIPAL' | 'GESTOR_APOIO' | 'COLABORADOR'
 
 export type TeamStatus = 'ACTIVE' | 'ARCHIVED'
 
+/** Usuário inativo não autentica e perde o acesso na hora (PRD seção 3.4). */
+export type UserStatus = 'ACTIVE' | 'INACTIVE'
+
 export interface User {
   id: string
   name: string
   email: string
   role: Role
+  status: UserStatus
   createdAt: string
 }
 

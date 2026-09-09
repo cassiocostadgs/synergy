@@ -134,10 +134,11 @@ function CreateTeamDialog({
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // O Admin precisa escolher quem lidera o time; só Gestores/Admins podem gerir.
+  // O Admin precisa escolher quem lidera o time. Só Gestores/Admins podem gerir,
+  // e quem está inativo não tem acesso — a API recusaria de qualquer forma.
   const { data: users } = useResource<User[]>(authApi.listUsers, open && isAdmin)
   const eligible = (users ?? []).filter(
-    (user) => user.role === 'GESTOR' || user.role === 'ADMIN',
+    (user) => (user.role === 'GESTOR' || user.role === 'ADMIN') && user.status === 'ACTIVE',
   )
 
   async function handleSubmit(event: FormEvent) {

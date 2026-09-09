@@ -58,13 +58,14 @@ func run(logger *slog.Logger) error {
 	tokens := auth.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL)
 
 	// Casos de uso
-	authUC := usecase.NewAuthUseCase(users, profiles, hasher, tokens)
+	authUC := usecase.NewAuthUseCase(users, profiles, members, hasher, tokens)
 	teamUC := usecase.NewTeamUseCase(teams, members, users)
 
 	router := handler.NewRouter(handler.RouterConfig{
 		Auth:           authUC,
 		Teams:          teamUC,
 		TokenParser:    tokens,
+		Sessions:       authUC,
 		Logger:         logger,
 		AllowedOrigins: cfg.AllowedOrigins,
 	})

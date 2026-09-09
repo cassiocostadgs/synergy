@@ -299,7 +299,10 @@ function AddMemberDialog({
 
   const { data: users } = useResource<User[]>(authApi.listUsers, open)
   const memberIds = new Set(existing.map((member) => member.userId))
-  const candidates = (users ?? []).filter((user) => !memberIds.has(user.id))
+  // Inativos ficam de fora: sem acesso, não participam do time.
+  const candidates = (users ?? []).filter(
+    (user) => !memberIds.has(user.id) && user.status === 'ACTIVE',
+  )
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()

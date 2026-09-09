@@ -223,6 +223,7 @@ handler  →  usecase  →  domain  ←  repository
 | PATCH | `/api/v1/me/password` | autenticado — troca a própria senha (exige a atual) |
 | GET | `/api/v1/users` | Admin, Gestor |
 | POST | `/api/v1/users` | Admin |
+| PATCH | `/api/v1/users/{userId}/status` | Admin — ativa ou inativa um acesso |
 | GET | `/api/v1/teams` | autenticado (Admin vê todos) |
 | POST | `/api/v1/teams` | Admin, Gestor |
 | GET | `/api/v1/teams/{teamId}` | membros do time / Admin |

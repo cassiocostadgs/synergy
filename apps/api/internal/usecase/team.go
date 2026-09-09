@@ -188,8 +188,12 @@ func (uc *TeamUseCase) AddMember(
 		}
 	}
 
-	if _, err := uc.loadUser(ctx, userID); err != nil {
+	usuario, err := uc.loadUser(ctx, userID)
+	if err != nil {
 		return nil, err
+	}
+	if !usuario.IsActive() {
+		return nil, domain.Conflict("%s está com o acesso inativo e não pode ser adicionado", usuario.Name)
 	}
 
 	existing, err := uc.findMember(ctx, team.ID, userID)
@@ -421,7 +425,7 @@ func (uc *TeamUseCase) assertNoSupportManager(ctx context.Context, teamID uuid.U
 }
 
 // assertCanBePrincipal garante que apenas usuários com papel global de Gestor
-// (ou Admin) exerçam a gestão de um time.
+// (ou Admin) e com acesso ativo exerçam a gestão de um time.
 func (uc *TeamUseCase) assertCanBePrincipal(ctx context.Context, userID uuid.UUID) error {
 	user, err := uc.loadUser(ctx, userID)
 	if err != nil {
@@ -429,6 +433,10 @@ func (uc *TeamUseCase) assertCanBePrincipal(ctx context.Context, userID uuid.UUI
 	}
 	if user.Role != domain.RoleGestor && user.Role != domain.RoleAdmin {
 		return domain.Validation("apenas usuários com papel global de Gestor ou Admin podem gerir um time")
+	}
+	// Contrapartida da inativação: quem não tem acesso não pode liderar time.
+	if !user.IsActive() {
+		return domain.Conflict("%s está com o acesso inativo e não pode gerir um time", user.Name)
 	}
 	return nil
 }

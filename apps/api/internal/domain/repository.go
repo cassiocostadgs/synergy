@@ -17,6 +17,8 @@ type UserRepository interface {
 	// UpdatePassword grava um novo hash de senha. Recebe o hash pronto: a
 	// escolha do algoritmo é da camada de infraestrutura, não do domínio.
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+	// UpdateStatus ativa ou inativa o usuário.
+	UpdateStatus(ctx context.Context, userID uuid.UUID, status UserStatus) error
 }
 
 // ProfileRepository abstrai a persistência do perfil/gamificação.
@@ -50,4 +52,7 @@ type TeamMemberRepository interface {
 	// o novo membro a Gestor Principal atomicamente, para que o time nunca fique
 	// sem Gestor Principal nem com dois ao mesmo tempo (Regra de Negócio 1).
 	TransferPrincipal(ctx context.Context, teamID, fromUserID, toUserID uuid.UUID) error
+	// LeadsActiveTeam informa se o usuário é Gestor Principal de algum time ativo.
+	// Usado para impedir que a liderança de um time fique com alguém inativo.
+	LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
 }

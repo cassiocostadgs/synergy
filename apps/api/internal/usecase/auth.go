@@ -21,21 +21,35 @@ type TokenIssuer interface {
 	Issue(user *domain.User) (token string, expiresAt time.Time, err error)
 }
 
-// AuthUseCase cobre autenticação e o cadastro de usuários pelo Admin.
+// TeamLeadershipChecker é a fatia de TeamMemberRepository de que a gestão de
+// usuários precisa: saber se alguém lidera um time ativo antes de inativá-lo.
+type TeamLeadershipChecker interface {
+	LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
+}
+
+// AuthUseCase cobre autenticação, autogestão e o cadastro de usuários pelo Admin.
 type AuthUseCase struct {
-	users    domain.UserRepository
-	profiles domain.ProfileRepository
-	hasher   PasswordHasher
-	tokens   TokenIssuer
+	users      domain.UserRepository
+	profiles   domain.ProfileRepository
+	leadership TeamLeadershipChecker
+	hasher     PasswordHasher
+	tokens     TokenIssuer
 }
 
 func NewAuthUseCase(
 	users domain.UserRepository,
 	profiles domain.ProfileRepository,
+	leadership TeamLeadershipChecker,
 	hasher PasswordHasher,
 	tokens TokenIssuer,
 ) *AuthUseCase {
-	return &AuthUseCase{users: users, profiles: profiles, hasher: hasher, tokens: tokens}
+	return &AuthUseCase{
+		users:      users,
+		profiles:   profiles,
+		leadership: leadership,
+		hasher:     hasher,
+		tokens:     tokens,
+	}
 }
 
 // LoginOutput é o resultado de uma autenticação bem-sucedida.
@@ -63,6 +77,10 @@ func (uc *AuthUseCase) Login(ctx context.Context, email, password string) (*Logi
 
 	if err := uc.hasher.Compare(user.PasswordHash, password); err != nil {
 		return nil, domain.Unauthorized("credenciais inválidas")
+	}
+
+	if !user.IsActive() {
+		return nil, domain.Forbidden("este acesso foi inativado; procure um administrador")
 	}
 
 	// O papel Auditor existe no schema mas está fora do escopo do MVP (PRD seção 5):
@@ -239,6 +257,7 @@ func (uc *AuthUseCase) CreateUser(ctx context.Context, actor domain.Actor, input
 		Email:        email,
 		PasswordHash: hash,
 		Role:         role,
+		Status:       domain.UserStatusActive,
 		CreatedAt:    time.Now().UTC(),
 	}
 	profile := &domain.Profile{
@@ -253,6 +272,80 @@ func (uc *AuthUseCase) CreateUser(ctx context.Context, actor domain.Actor, input
 		return nil, err
 	}
 	return user, nil
+}
+
+// SetUserStatus ativa ou inativa um usuário. Restrito ao Admin global.
+//
+// Inativar não exclui: o vínculo com os times permanece, preservando o
+// histórico. O que o usuário perde é o acesso — imediatamente, porque
+// EnsureActive é consultado em cada requisição autenticada.
+func (uc *AuthUseCase) SetUserStatus(
+	ctx context.Context,
+	actor domain.Actor,
+	userID uuid.UUID,
+	status domain.UserStatus,
+) (*domain.User, error) {
+	if !actor.IsAdmin() {
+		return nil, domain.Forbidden("apenas o Admin pode ativar ou inativar usuários")
+	}
+	if !status.Valid() {
+		return nil, domain.Validation("status inválido: %q", status)
+	}
+	// Sem isso o Admin poderia se trancar fora do sistema.
+	if actor.UserID == userID && status == domain.UserStatusInactive {
+		return nil, domain.Conflict("você não pode inativar o seu próprio acesso")
+	}
+
+	user, err := uc.users.FindByID(ctx, userID)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return nil, domain.NotFound("usuário não encontrado")
+		}
+		return nil, err
+	}
+	if user.Status == status {
+		return user, nil
+	}
+
+	// RN1 de reflexo: um time ativo não pode ficar liderado por quem não tem
+	// acesso. A liderança precisa ser transferida antes.
+	if status == domain.UserStatusInactive {
+		lidera, err := uc.leadership.LeadsActiveTeam(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if lidera {
+			return nil, domain.Conflict(
+				"%s é Gestor Principal de um time ativo; transfira a liderança antes de inativar",
+				user.Name,
+			)
+		}
+	}
+
+	if err := uc.users.UpdateStatus(ctx, userID, status); err != nil {
+		return nil, err
+	}
+	user.Status = status
+	return user, nil
+}
+
+// EnsureActive valida que a sessão ainda pertence a um usuário ativo.
+//
+// É chamado pelo middleware em cada requisição autenticada. Custa uma leitura
+// por chave primária, e é o preço de a inativação valer na hora: sem isso, um
+// token já emitido continuaria sendo aceito até expirar.
+func (uc *AuthUseCase) EnsureActive(ctx context.Context, actor domain.Actor) error {
+	user, err := uc.users.FindByID(ctx, actor.UserID)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return domain.Unauthorized("sessão inválida")
+		}
+		return err
+	}
+	if !user.IsActive() {
+		return domain.Forbidden("este acesso foi inativado; procure um administrador")
+	}
+	return nil
 }
 
 // ListUsers lista os usuários do sistema. Admin e Gestor têm acesso, pois o

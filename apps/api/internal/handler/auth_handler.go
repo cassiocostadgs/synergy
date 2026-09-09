@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/db1group/synergy/apps/api/internal/domain"
 	"github.com/db1group/synergy/apps/api/internal/usecase"
 )
@@ -129,6 +131,35 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, http.StatusCreated, toUserResponse(user))
+}
+
+// SetUserStatus — PATCH /api/v1/users/{userId}/status (restrito ao Admin)
+func (h *AuthHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	userID, err := parseUUID(chi.URLParam(r, "userId"), "userId")
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	var req setUserStatusRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	user, err := h.auth.SetUserStatus(r.Context(), actor, userID, domain.UserStatus(req.Status))
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, toUserResponse(user))
 }
 
 // ListUsers — GET /api/v1/users (Admin e Gestor, para montar o time)

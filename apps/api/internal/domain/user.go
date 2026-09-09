@@ -39,6 +39,19 @@ func (r Role) ImplementedInMVP() bool {
 	}
 }
 
+// UserStatus controla se o usuário pode usar o sistema. Inativar preserva o
+// histórico de participação em times, o que uma exclusão destruiria.
+type UserStatus string
+
+const (
+	UserStatusActive   UserStatus = "ACTIVE"
+	UserStatusInactive UserStatus = "INACTIVE"
+)
+
+func (s UserStatus) Valid() bool {
+	return s == UserStatusActive || s == UserStatusInactive
+}
+
 // User é a entidade de usuário do sistema.
 type User struct {
 	ID           uuid.UUID
@@ -46,7 +59,13 @@ type User struct {
 	Email        string
 	PasswordHash string
 	Role         Role
+	Status       UserStatus
 	CreatedAt    time.Time
+}
+
+// IsActive indica se o usuário pode autenticar e usar o sistema.
+func (u User) IsActive() bool {
+	return u.Status == UserStatusActive
 }
 
 // Profile guarda os dados de perfil e gamificação do usuário (XP e nível).

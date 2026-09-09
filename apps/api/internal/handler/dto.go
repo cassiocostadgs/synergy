@@ -56,11 +56,16 @@ type transferPrincipalRequest struct {
 
 // --- Responses ---
 
+type setUserStatusRequest struct {
+	Status string `json:"status"`
+}
+
 type userResponse struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Email     string    `json:"email"`
 	Role      string    `json:"role"`
+	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
@@ -103,6 +108,7 @@ func toUserResponse(user *domain.User) userResponse {
 		Name:      user.Name,
 		Email:     user.Email,
 		Role:      string(user.Role),
+		Status:    string(user.Status),
 		CreatedAt: user.CreatedAt,
 	}
 }
