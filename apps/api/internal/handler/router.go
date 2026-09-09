@@ -29,6 +29,33 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	router.Use(RequestLogger(cfg.Logger))
 	router.Use(CORS(cfg.AllowedOrigins))
 
+	// Respostas de rota/método inválidos também seguem o envelope da API — sem
+	// isso o chi devolveria texto puro no 404 e corpo vazio no 405, quebrando o
+	// contrato que o frontend espera.
+	router.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		respondError(w, domain.NotFound("rota não encontrada"))
+	})
+	router.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusMethodNotAllowed, envelope{
+			Error: &errorBody{
+				Code:    "METHOD_NOT_ALLOWED",
+				Message: "método não permitido para esta rota",
+			},
+		})
+	})
+
+	// Raiz apenas identifica o serviço: quem abre a URL da API no navegador
+	// recebe uma resposta útil em vez de um 404 sem explicação.
+	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+		respond(w, http.StatusOK, map[string]any{
+			"service": "Synergy API",
+			"endpoints": map[string]string{
+				"health": "/health",
+				"api":    "/api/v1",
+			},
+		})
+	})
+
 	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		respond(w, http.StatusOK, map[string]string{"status": "ok"})
 	})

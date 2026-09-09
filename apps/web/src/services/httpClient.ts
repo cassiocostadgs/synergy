@@ -3,7 +3,16 @@
  * então centralizamos aqui o desempacotamento e a tradução de erros.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
+/*
+ * Base da API. VITE_API_URL é resolvida no build (o Vite substitui pelo literal),
+ * não em runtime.
+ *
+ * A barra final é removida de propósito: sem isso, "https://api.exemplo.com/"
+ * geraria "…com//api/v1" e o valor "/" geraria "//api/v1", que o navegador trata
+ * como outro host (URL protocol-relative). Deixar a variável vazia é o jeito de
+ * apontar para a mesma origem do frontend.
+ */
+const BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/+$/, '')
 const TOKEN_KEY = 'synergy.token'
 
 interface ApiEnvelope<T> {

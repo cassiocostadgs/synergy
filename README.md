@@ -89,6 +89,99 @@ Acesse com o usuário criado no seed (padrão: `admin@synergy.dev`).
 
 ---
 
+## 4. Deploy
+
+### ⚠️ O frontend exige fallback para o `index.html`
+
+O app usa `BrowserRouter` (URLs limpas, sem `#`), então rotas como `/perfil` e
+`/times/<id>` **existem apenas no navegador** — não há arquivo com esses nomes no disco.
+Se o servidor não estiver configurado, acessar `https://seudominio/perfil` direto (ou dar
+F5 nessa página) devolve **404 do servidor**, embora a navegação por dentro do app
+funcione. O dev server do Vite já trata isso; produção precisa da regra explícita.
+
+A configuração é: **toda rota desconhecida devolve `index.html`**, e o React Router
+resolve o resto.
+
+### `VITE_API_URL` é resolvida no build, não em runtime
+
+O Vite substitui a variável pelo valor literal durante `npm run build`. Portanto ela
+precisa estar definida **no momento de buildar** — mudá-la depois no servidor não tem
+efeito algum.
+
+```bash
+cd apps/web
+
+# API no mesmo domínio, atrás de proxy (dispensa CORS): deixe o valor vazio
+echo "VITE_API_URL=" > .env.production
+
+# API em outro domínio:
+# echo "VITE_API_URL=https://api.seudominio.com" > .env.production
+
+npm run build          # gera apps/web/dist/
+```
+
+| Valor | Requisições vão para |
+| :--- | :--- |
+| vazio (ou `/`) | mesma origem do frontend — `/api/v1/…` |
+| `https://api.seudominio.com` | esse domínio (exige `CORS_ALLOWED_ORIGINS` na API) |
+| variável ausente | `http://localhost:8080` — o padrão de desenvolvimento |
+
+Barras finais são removidas automaticamente, então `https://api.seudominio.com/` também
+funciona. Grave o arquivo **sem BOM**: um `.env` com BOM faz o Vite ignorar a chave
+silenciosamente e cair no padrão de desenvolvimento (`Set-Content -Encoding utf8` no
+PowerShell 5.1 escreve BOM — use `-Encoding utf8NoBOM`, o `echo` acima, ou o VS Code).
+
+### Exemplo com nginx (frontend + proxy da API no mesmo domínio)
+
+```nginx
+server {
+    listen 80;
+    server_name synergy.exemplo.com;
+
+    root /var/www/synergy;   # conteúdo de apps/web/dist
+    index index.html;
+
+    # SPA: rota desconhecida devolve o index.html para o React Router resolver
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Os assets têm hash no nome, então podem ter cache longo
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # API no mesmo domínio — com isso não há CORS a configurar
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+O equivalente em outras hospedagens: `_redirects` com `/* /index.html 200` (Netlify),
+`rewrites` para `/index.html` (Vercel), *Error Document* apontando para `index.html`
+(S3 + CloudFront), `navigationFallback` (Azure Static Web Apps) ou `web.config` com
+regra de *rewrite* (IIS).
+
+### Variáveis da API em produção
+
+| Variável | Cuidado |
+| :--- | :--- |
+| `DATABASE_URL` | usuário sem privilégio de superusuário; TLS ativo (`sslmode=require`) |
+| `JWT_SECRET` | segredo forte e exclusivo do ambiente — trocá-lo invalida as sessões ativas |
+| `CORS_ALLOWED_ORIGINS` | só o domínio real do frontend; desnecessário se a API estiver atrás do mesmo domínio |
+| `API_PORT` | a porta que o proxy encaminha |
+
+As migrations são aplicadas automaticamente na subida da API, então o deploy não tem
+passo manual de banco. Rode `./cmd/seed` uma única vez, para criar o Admin inicial.
+
+---
+
 ## Arquitetura
 
 ### Backend — camadas (dependências sempre para dentro)
@@ -122,6 +215,8 @@ handler  →  usecase  →  domain  ←  repository
 
 | Método | Rota | Acesso |
 | :--- | :--- | :--- |
+| GET | `/` | público — identifica o serviço |
+| GET | `/health` | público |
 | POST | `/api/v1/auth/login` | público |
 | GET | `/api/v1/me` | autenticado |
 | GET | `/api/v1/users` | Admin, Gestor |
@@ -137,4 +232,8 @@ handler  →  usecase  →  domain  ←  repository
 | DELETE | `/api/v1/teams/{teamId}/members/{userId}` | Gestores do time / Admin |
 | POST | `/api/v1/teams/{teamId}/transfer-principal` | Gestor Principal / Admin |
 
-Todas as respostas usam o envelope `{ "data": … }` ou `{ "error": { "code", "message" } }`.
+Todas as respostas usam o envelope `{ "data": … }` ou `{ "error": { "code", "message" } }`,
+inclusive rota não encontrada (404) e método não permitido (405).
+
+Abrir a raiz da API no navegador devolve a identificação do serviço — as rotas de negócio
+ficam sob `/api/v1` e exigem `Authorization: Bearer <token>`.
