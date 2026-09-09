@@ -8,21 +8,30 @@ Este é um repositório monorepo do projeto **Synergy**. O backend em Go e o fro
 synergy/
 ├── apps/
 │   ├── api/                  # Backend em Go
-│   │   ├── cmd/api/          # Ponto de entrada (main.go)
+│   │   ├── cmd/api/          # Ponto de entrada da API (main.go)
+│   │   ├── cmd/seed/         # Bootstrap do usuário Admin inicial
 │   │   └── internal/         # Código privado do app (Arquitetura em Camadas)
 │   │       ├── domain/       # Entidades do negócio e interfaces (sem dependências externas)
 │   │       ├── usecase/      # Regras de negócio e casos de uso
-│   │       ├── repository/   # Implementação de banco de dados (PostgreSQL via GORM/pgx)
-│   │       └── handler/      # Camada HTTP (Controllers/Handlers e DTOs)
+│   │       ├── repository/   # Implementação de banco de dados (PostgreSQL via pgx)
+│   │       │   └── migrations/  # SQL embutido no binário (aplicado na subida)
+│   │       ├── handler/      # Camada HTTP (Handlers, DTOs, middlewares, router)
+│   │       ├── auth/         # Detalhes técnicos de autenticação (bcrypt, JWT)
+│   │       └── config/       # Leitura e validação das variáveis de ambiente
 │   │
 │   └── web/                  # Frontend em React (Vite + TypeScript)
 │       └── src/
-│           ├── components/   # Componentes de UI genéricos (Design System / Shadcn)
-│           ├── features/     # Módulos por domínio (metas, time, dinâmicas)
+│           ├── app/          # App Shell (navegação) e guards de rota
+│           ├── components/   # Componentes de UI genéricos (Design System)
+│           ├── features/     # Módulos por domínio (auth, teams, users, profile)
 │           │   ├── api/      # Chamadas de API específicas
 │           │   ├── hooks/    # Custom hooks da feature
 │           │   └── ui/       # Componentes visuais da feature
-│           ├── services/     # Cliente HTTP global (Axios/Fetch)
+│           ├── hooks/        # Hooks genéricos reutilizáveis entre features
+│           ├── services/     # Cliente HTTP global (fetch + envelope da API)
 │           └── types/        # Tipos TypeScript compartilhados
-├── PRD.md
+├── PRD.md                    # Requisitos de produto
+├── DESIGN-SYSTEM.md          # Design System "Neon Tokyo"
+├── tasks.md                  # Backlog do MVP e status de implementação
+├── README.md                 # Como rodar o projeto
 └── CLAUDE.md

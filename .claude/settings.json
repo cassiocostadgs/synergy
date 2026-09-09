@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($out = @\\(\\); foreach \\($c in @\\('go','node','npm','docker','psql'\\)\\) { $cmd = Get-Command $c -ErrorAction SilentlyContinue; if \\($null -ne $cmd\\) { $v = & $c --version 2>$null | Select-Object -First 1; $out += \"$c :: $v\" } else { $out += \"$c :: NAO ENCONTRADO\" } }; $out)",
+      "PowerShell($paths = @\\(\"$env:ProgramFiles\\\\Go\\\\bin\\\\go.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\Go\\\\bin\\\\go.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\Go\\\\bin\\\\go.exe\", \"$env:USERPROFILE\\\\go\\\\bin\\\\go.exe\", \"$env:USERPROFILE\\\\scoop\\\\shims\\\\go.exe\", \"C:\\\\Go\\\\bin\\\\go.exe\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { \"ENCONTRADO: $p\" } }; \"--- winget/choco go? ---\"; if \\(Get-Command winget -ErrorAction SilentlyContinue\\) { \"winget disponivel\" } else { \"winget ausente\" }; if \\(Get-Command choco -ErrorAction SilentlyContinue\\) { \"choco disponivel\" } else { \"choco ausente\" }; \"--- docker desktop? ---\"; if \\(Test-Path \"$env:ProgramFiles\\\\Docker\\\\Docker\\\\resources\\\\bin\\\\docker.exe\"\\) { \"docker desktop instalado \\(fora do PATH\\)\" } else { \"docker desktop ausente\" })",
+      "PowerShell(Write-Output \"=== Instalando Go ===\"; winget install --id GoLang.Go --accept-package-agreements --accept-source-agreements --silent --disable-interactivity; Write-Output \"=== Go exit: $LASTEXITCODE ===\"; Write-Output \"=== Instalando PostgreSQL 17 ===\"; winget install --id PostgreSQL.PostgreSQL.17 --accept-package-agreements --accept-source-agreements --silent --disable-interactivity --custom '--unattendedmodeui none --superpassword synergy_dev_pw --serverport 5432'; Write-Output \"=== PG exit: $LASTEXITCODE ===\")"
+    ]
+  }
+}

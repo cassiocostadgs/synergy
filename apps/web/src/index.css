@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+/*
+ * Design System "Neon Tokyo" (DESIGN-SYSTEM.md seção 2).
+ * Dark mode é obrigatório: os tokens abaixo já são a paleta escura.
+ */
+@theme {
+  --color-surface: #071010;
+  --color-surface-dim: #0d1515;
+  --color-surface-container-low: #101919;
+  --color-surface-container: #151d1d;
+  --color-surface-container-high: #1d2827;
+  --color-outline: #24312f;
+  --color-outline-strong: #33403e;
+
+  --color-primary: #ff2d78;
+  --color-primary-soft: #ff2d7826;
+  --color-secondary: #00fbfb;
+  --color-secondary-soft: #00fbfb1f;
+
+  --color-content: #e9f2f1;
+  --color-content-muted: #8ba3a0;
+
+  --color-success: #29e6a4;
+  --color-warning: #ffb02e;
+  --color-danger: #ff4d5e;
+
+  --font-sans: 'Sora', ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-glow-primary: 0 0 12px rgba(255, 45, 120, 0.18);
+  --shadow-glow-secondary: 0 0 12px rgba(0, 251, 251, 0.15);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-surface);
+    color: var(--color-content);
+    font-family: var(--font-sans);
+    /* Malha futurista sutil do fundo (DESIGN-SYSTEM.md seção 2) */
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(255, 45, 120, 0.08), transparent 42%),
+      radial-gradient(circle at 88% 0%, rgba(0, 251, 251, 0.07), transparent 38%),
+      linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      100% 100%,
+      44px 44px,
+      44px 44px;
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: #fff;
+  }
+}
+
+@layer components {
+  /* Ícones do Material Symbols usados na navegação */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24;
+  }
+}

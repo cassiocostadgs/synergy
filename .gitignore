@@ -1,0 +1,26 @@
+# Dependências
+node_modules/
+
+# Builds
+dist/
+build/
+apps/api/bin/
+*.exe
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Dados locais do PostgreSQL portátil
+.pgdata/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editores / SO
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

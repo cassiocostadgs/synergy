@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS team_members;
+DROP TABLE IF EXISTS teams;
+DROP TABLE IF EXISTS profiles;
+DROP TABLE IF EXISTS users;
+
+DROP TYPE IF EXISTS team_role;
+DROP TYPE IF EXISTS team_status;
+DROP TYPE IF EXISTS user_role;
