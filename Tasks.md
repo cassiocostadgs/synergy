@@ -143,6 +143,21 @@ aderência, é removida. Por isso nasceu sem persistência — a remoção não 
 - [ ] Histórico de sorteios (evitar repetir tema toda semana)
 - [ ] Testes automatizados da fórmula de rotação e das validações (hoje verificados por script pontual, fora da suíte)
 
+### Brackets — concluído
+- [x] Rota `/brackets` e item "Brackets" no menu lateral
+- [x] Lógica pura em `features/brackets/bracket.ts`, sem React nem dependências — testável isoladamente
+- [x] **Byes:** chave cresce até a próxima potência de 2 e a diferença vira passagem direta (5 opções → chave de 8 com 3 byes); a tela avisa quantos byes haverá antes de criar
+- [x] Chave **derivada** das escolhas, não mutada — trocar um vencedor anterior invalida automaticamente as escolhas seguintes que dependiam dele
+- [x] Tema (60 caracteres), de 2 a 16 opções, até 40 caracteres cada, sem repetidas
+- [x] Embaralhamento opcional da primeira rodada (ligado por padrão), que é também o sorteio de quem recebe bye
+- [x] Rodadas nomeadas (Oitavas, Quartas, Semifinal, Final); campeão destacado e anunciado por `aria-live`
+- [x] Ações "Recomeçar" (mantém a chave, limpa as escolhas) e "Nova chave"
+- [x] Verificado por script independente sobre o módulo real: 11 tamanhos de chave (2 a 16), torneio completo para 8 tamanhos com a propriedade **nº de opções − 1 cliques**, o caso de invalidação em cascata e 8 casos de borda da validação
+
+### Pendências, caso o módulo prove aderência
+- [ ] Persistência da chave (hoje recarregar a página perde o progresso — pior que no Sorteio, porque o Brackets leva mais tempo para concluir)
+- [ ] Testes automatizados da lógica de chaveamento (hoje verificados por script pontual, fora de suíte)
+
 ### Práticas Management 3.0 — fora de escopo
 - [ ] Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo de dados ou tela (PRD seção 5)
 

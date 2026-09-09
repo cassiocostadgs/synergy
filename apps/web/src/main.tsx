@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/app/AppShell'
 import { RequireAuth, RequireRole } from '@/app/guards'
 import { AuthProvider } from '@/features/auth/hooks/useAuth'
+import { BracketsPage } from '@/features/brackets/ui/BracketsPage'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { ProfilePage } from '@/features/profile/ui/ProfilePage'
 import { SorteioPage } from '@/features/sorteio/ui/SorteioPage'
@@ -41,6 +42,7 @@ createRoot(document.getElementById('root')!).render(
             />
             <Route path="/perfil" element={<ProfilePage />} />
             <Route path="/sorteio" element={<SorteioPage />} />
+            <Route path="/brackets" element={<BracketsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/times" replace />} />

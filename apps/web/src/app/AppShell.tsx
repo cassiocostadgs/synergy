@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/times', label: 'Times', icon: 'groups' },
   { to: '/usuarios', label: 'Usuários', icon: 'badge', roles: ['ADMIN', 'GESTOR'] },
   { to: '/sorteio', label: 'Sorteio', icon: 'casino' },
+  { to: '/brackets', label: 'Brackets', icon: 'emoji_events' },
 ]
 
 function visibleItems(role: Role | undefined): NavItem[] {

@@ -35,8 +35,8 @@ O MVP conta com 3 perfis de usuários com escopos de ação específicos:
 ### 3.2. Dinâmicas e Facilitação
 
 Módulo de ferramentas para conduzir rituais do time. Substitui o épico "Dinâmicas
-Management 3.0" que estava integralmente fora de escopo: a primeira entrega saiu, as
-práticas nomeadas continuam pendentes de especificação.
+Management 3.0" que estava integralmente fora de escopo: as duas primeiras ferramentas
+saíram, as práticas nomeadas continuam pendentes de especificação.
 
 > **Feature em avaliação (2026-09-09):** entra no produto para medir aderência. Se não
 > for adotada, será removida. A ausência de persistência é deliberada e mantém a remoção
@@ -56,7 +56,25 @@ Roleta para escolher aleatoriamente o tema de uma conversa (retro, daily, reuni�
   * O sorteio é **uniforme** e o vencedor é definido **antes** da animação — a roda é girada até ele. O caminho inverso (ler o ângulo final para descobrir o vencedor) pode exibir um setor diferente do resultado anunciado.
 * **Acesso:** hoje disponível a **qualquer usuário autenticado**, sem restrição de papel — decisão a revisar se o módulo for adotado.
 
-#### 3.2.2. Práticas Management 3.0 — **não especificadas**
+#### 3.2.2. Brackets — **entregue**
+
+Chaveamento de eliminação simples para o time decidir "o melhor" de um tema por votação
+sucessiva (ex: *melhor filme de todos os tempos*).
+
+* **Funcionalidades:**
+  * Informar um **tema** (até 60 caracteres) e as **opções**, uma por linha, **sem persistência** — a chave vive na tela e se perde ao recarregar.
+  * Embaralhar os confrontos da primeira rodada (opcional, ligado por padrão).
+  * Decidir cada confronto com **um clique**, até restar o campeão.
+  * Rodadas nomeadas conforme o tamanho (Oitavas, Quartas, Semifinal, Final).
+* **Regras de Negócio:**
+  * De **2 a 16 opções**, com até **40 caracteres** cada; opções repetidas são rejeitadas.
+  * **Byes:** quando o número de opções não é potência de 2, a chave cresce até a próxima potência e a diferença vira passagem direta na primeira rodada. Com 5 opções, a chave tem 8 posições e 3 byes. A tela informa quantos byes haverá **antes** de criar a chave.
+  * Como a ordem é embaralhada, quem recebe bye é definido por sorteio.
+  * O total de confrontos é sempre **nº de opções − 1**.
+  * **Trocar um vencedor invalida o que dependia dele:** ao voltar e mudar a decisão de um confronto anterior, as escolhas seguintes que envolviam o participante removido deixam de valer automaticamente. A chave é derivada das escolhas, não mutada.
+* **Acesso:** qualquer usuário autenticado, como o Sorteio de Temas.
+
+#### 3.2.3. Práticas Management 3.0 — **não especificadas**
 
 Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo
 de dados ou tela. Ver seção 5.
@@ -104,8 +122,8 @@ times permanece, preservando o histórico de participação que um `DELETE` dest
 
 > **Banco de dados:** PostgreSQL (acessado via GORM/pgx no backend, conforme `CLAUDE.md`).
 >
-> O Sorteio de Temas (seção 3.2.1) **não possui modelo de dados**: a lista vive no navegador
-> durante a sessão e nada é gravado.
+> O Sorteio de Temas (3.2.1) e o Brackets (3.2.2) **não possuem modelo de dados**: as listas
+> vivem no navegador durante a sessão e nada é gravado.
 
 
 enum Role {
