@@ -27,7 +27,7 @@ export function ProfilePage() {
               <Avatar name={user.name} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-content">{user.name}</h2>
+              <h2 className="font-display text-lg font-bold text-content">{user.name}</h2>
               <p className="text-sm text-content-muted">{user.email}</p>
             </div>
           </div>
@@ -57,7 +57,7 @@ export function ProfilePage() {
           <KpiCard label="Experiência" value={`${profile.xp} XP`} accent="secondary" icon="bolt" />
 
           <Card className="p-5 sm:col-span-2">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-content-muted uppercase">
+            <p className="text-[13px] font-semibold tracking-[0.18em] text-content-muted uppercase">
               Progresso para o nível {profile.level + 1}
             </p>
             <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-surface-container-high">

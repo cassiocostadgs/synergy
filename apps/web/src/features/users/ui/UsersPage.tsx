@@ -57,7 +57,7 @@ export function UsersPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
-              <tr className="border-b border-outline text-[11px] tracking-[0.14em] text-content-muted uppercase">
+              <tr className="border-b border-outline text-[13px] tracking-[0.14em] text-content-muted uppercase">
                 <th className="px-5 py-3 font-semibold">Usuário</th>
                 <th className="px-5 py-3 font-semibold">Papel global</th>
                 <th className="px-5 py-3 font-semibold">Desde</th>

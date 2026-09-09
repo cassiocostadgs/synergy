@@ -7,7 +7,14 @@ Este documento descreve detalhadamente a arquitetura visual, o sistema de design
 ## 1. Visão Geral e North Star ("Electric Nightscape")
 - **Conceito:** Cyberpunk-inspired, retro-futurista, imersivo e de alta energia.
 - **Modo de Cor:** Dark Mode obrigatório (`bg-surface` escuro profundo com acentos luminosos).
-- **Tipografia Principal:** `Sora` (pesos variando de regular a bold, com títulos marcantes e tracking ajustado).
+Dupla tipográfica no estilo **HUD de video game** — uma display marcante para a voz de
+marca e uma techno legível para o conteúdo:
+
+- **Texto da interface — `Chakra Petch`** (token `--font-sans`, padrão do `body`): techno com cantos chanfrados, bem cyberpunk, com caixa mista real e legível nos rótulos de 13px das tabelas. Cobre navegação, rótulos, botões, tabelas e formulários.
+- **Display — `Orbitron`** (token `--font-display`, classe `font-display`): a sci-fi geométrica clássica de HUD. Larga demais para texto corrido, então fica **restrita a trechos curtos**: logotipo, títulos de página, nome de time nos cards e valores de KPI.
+- **Ajustes de legibilidade:** o `body` usa `font-size: 16px` e `letter-spacing: 0.01em`; a escala tipográfica (`--text-*`) está um passo acima do padrão do Tailwind.
+- **Sem fonte de apoio:** como a Chakra Petch tem caixa mista real, e-mails e campos de formulário não precisam mais de uma terceira família (o antigo `--font-body` com `Sora` foi removido).
+- **Histórico de escolha:** `Sora` → `Bebas Neue` → `Cinzel` → `Grenze Gotisch` → **`Orbitron` + `Chakra Petch`**. As quatro primeiras eram fonte única; a lição foi que display única não sustenta tabela e formulário. Para trocar, mexa no `<link>` do Google Fonts em `index.html` e nos tokens `--font-sans` / `--font-display` em `src/index.css`.
 
 ---
 
@@ -26,18 +33,18 @@ O sistema utiliza um layout fixo com duas barras de navegação principais:
 ### 3.1. SideNavBar (Barra Lateral Esquerda)
 - **Largura:** `w-64` (fixa à esquerda, `h-screen`).
 - **Fundo:** `bg-surface-container-low` com borda divisória sutil.
-- **Cabeçalho da Sidebar:** Logotipo "Synergy" com subtítulo de ambiente (ex: *Remote Intelligence* ou *Operations*).
+- **Cabeçalho da Sidebar:** apenas o logotipo "Synergy", sem subtítulo.
 - **Abas de Navegação:**
   - Ícones do Google Material Icons / Material Symbols.
   - Estado ativo: Fundo translúcido ou borda lateral destacada com a cor primária (`#ff2d78` ou `#00ffff`).
-- **Rodapé da Sidebar:** Botões de Ação rápida (ex: "New Report", "Spawn User", "Help", "Logout").
+- **Sem rodapé.** A sidebar contém somente a navegação por área do produto. O que é do próprio usuário (perfil e sair) fica no menu do canto superior direito.
 
 ### 3.2. TopNavBar (Barra Superior)
 - **Altura:** `h-16` / `h-20`, sticky (`top-0 z-50`).
 - **Layout:** Flexbox com alinhamento `justify-between`, padding lateral generoso.
-- **Elementos:** 
-  - Links centrais de navegação (Dashboard, Teams, Dynamics, Settings).
-  - Ícones de ações à direita (Notificações, Configurações, Avatar do Usuário).
+- **Elementos:**
+  - **Sem links de navegação.** A navegação vive exclusivamente na SideNavBar (e na BottomNavBar no mobile, onde a lateral fica oculta) — o cabeçalho não duplica o menu.
+  - **Menu do usuário no canto superior direito:** nome, papel, nível e avatar formam um botão que abre o menu com *Meu perfil* e *Sair*. Fecha ao clicar fora ou com `Esc`.
 
 ---
 

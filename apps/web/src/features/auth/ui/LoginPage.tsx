@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 
-import { Button, Card, ErrorBanner, Icon, Input } from '@/components/ui'
+import { Logo } from '@/components/Logo'
+import { Button, Card, ErrorBanner, Input } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { ApiError } from '@/services/httpClient'
 
@@ -32,16 +33,8 @@ export function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm p-8 shadow-glow-primary">
-        <div className="mb-8 text-center">
-          <div className="mb-3 flex justify-center">
-            <span className="flex size-12 items-center justify-center rounded-xl border border-primary/40 bg-primary-soft">
-              <Icon name="hub" className="text-[26px] text-primary" />
-            </span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-content">Synergy</h1>
-          <p className="mt-1 text-[11px] font-semibold tracking-[0.28em] text-secondary uppercase">
-            Remote Intelligence
-          </p>
+        <div className="mb-8 flex justify-center">
+          <Logo size="lg" orientation="vertical" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -18,17 +18,55 @@
   --color-secondary: #00fbfb;
   --color-secondary-soft: #00fbfb1f;
 
-  --color-content: #e9f2f1;
-  --color-content-muted: #8ba3a0;
+  --color-content: #eef6f5;
+  /*
+   * Texto secundário. Clareado em duas etapas (#8ba3a0 → #b0c5c2 → atual) para
+   * destacar mais no fundo escuro. Contraste medido sobre os cards (#151d1d):
+   * 11.21:1, contra 6.40:1 do valor original — atende WCAG AAA em todas as
+   * superfícies do tema.
+   *
+   * O limite é a hierarquia: neste valor o secundário ainda é ~30% mais escuro
+   * que --color-content. Clarear além disso (testados #c9dcd9 e #d1e3e0) reduz a
+   * diferença para 24% e 19%, e o texto secundário deixa de se distinguir do
+   * principal.
+   */
+  --color-content-muted: #c2d5d2;
 
   --color-success: #29e6a4;
   --color-warning: #ffb02e;
   --color-danger: #ff4d5e;
 
-  --font-sans: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  /*
+   * Dupla tipográfica no estilo HUD de video game.
+   *
+   * --font-sans (Chakra Petch) é o texto da interface: techno com cantos
+   * chanfrados, caixa mista real e legível nos rótulos de 13px das tabelas.
+   *
+   * --font-display (Orbitron) é a voz de marca: logo, títulos de página e
+   * valores de KPI. É larga e geométrica demais para texto corrido, então fica
+   * restrita a trechos curtos, aplicada pela classe `font-display`.
+   *
+   * Como a Chakra Petch tem caixa mista real, o antigo --font-body (Sora) deixou
+   * de ser necessário: e-mails e campos de formulário já ficam inequívocos.
+   */
+  --font-sans: 'Chakra Petch', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Orbitron', 'Chakra Petch', ui-sans-serif, sans-serif;
 
   --shadow-glow-primary: 0 0 12px rgba(255, 45, 120, 0.18);
   --shadow-glow-secondary: 0 0 12px rgba(0, 251, 251, 0.15);
+
+  /*
+   * Escala tipográfica um passo acima do padrão do Tailwind. Redefinir os tokens
+   * (em vez de mexer no root font-size) aumenta só o texto — o espaçamento e a
+   * densidade do layout ficam intactos.
+   */
+  --text-xs: 0.8125rem; /* 13px */
+  --text-sm: 0.9375rem; /* 15px */
+  --text-base: 1.0625rem; /* 17px */
+  --text-lg: 1.1875rem; /* 19px */
+  --text-xl: 1.375rem; /* 22px */
+  --text-2xl: 1.625rem; /* 26px */
+  --text-4xl: 2.5rem; /* 40px */
 }
 
 @layer base {
@@ -42,6 +80,13 @@
     background-color: var(--color-surface);
     color: var(--color-content);
     font-family: var(--font-sans);
+    /*
+     * A Cinzel já é larga e bem espaçada, então o tracking generoso que a Bebas
+     * exigia atrapalha aqui — fica só um toque, para as capitulares pequenas não
+     * colarem umas nas outras.
+     */
+    font-size: 16px;
+    letter-spacing: 0.01em;
     /* Malha futurista sutil do fundo (DESIGN-SYSTEM.md seção 2) */
     background-image:
       radial-gradient(circle at 12% 8%, rgba(255, 45, 120, 0.08), transparent 42%),

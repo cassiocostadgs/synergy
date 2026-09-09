@@ -1,5 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
+import { Logo } from '@/components/Logo'
 import { Avatar, Icon, cx } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { ROLE_LABEL, type Role } from '@/types'
@@ -12,10 +14,11 @@ interface NavItem {
   roles?: Role[]
 }
 
+// Navegação por área do produto. O que é do próprio usuário (perfil e sair) não
+// entra aqui: vive no menu do canto superior direito.
 const NAV_ITEMS: NavItem[] = [
   { to: '/times', label: 'Times', icon: 'groups' },
   { to: '/usuarios', label: 'Usuários', icon: 'badge', roles: ['ADMIN', 'GESTOR'] },
-  { to: '/perfil', label: 'Perfil', icon: 'account_circle' },
 ]
 
 function visibleItems(role: Role | undefined): NavItem[] {
@@ -31,7 +34,32 @@ export function AppShell() {
   const navigate = useNavigate()
   const items = visibleItems(me?.user.role)
 
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fecha o menu do usuário ao clicar fora ou apertar Esc.
+  useEffect(() => {
+    if (!menuOpen) return
+
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [menuOpen])
+
   function handleLogout() {
+    setMenuOpen(false)
     logout()
     navigate('/login', { replace: true })
   }
@@ -41,15 +69,7 @@ export function AppShell() {
       {/* SideNavBar — desktop */}
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-outline bg-surface-container-low/80 backdrop-blur-sm lg:flex">
         <div className="border-b border-outline px-6 py-5">
-          <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-lg border border-primary/40 bg-primary-soft">
-              <Icon name="hub" className="text-[18px] text-primary" />
-            </span>
-            <span className="text-lg font-bold tracking-tight text-content">Synergy</span>
-          </div>
-          <p className="mt-1 text-[10px] font-semibold tracking-[0.24em] text-secondary uppercase">
-            Remote Intelligence
-          </p>
+          <Logo size="md" />
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
@@ -71,62 +91,73 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-
-        {/* Rodapé com ações rápidas (DESIGN-SYSTEM.md seção 3.1) */}
-        <div className="border-t border-outline px-3 py-4">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-content-muted transition-colors hover:bg-surface-container-high hover:text-danger"
-          >
-            <Icon name="logout" className="text-[20px]" />
-            Sair
-          </button>
-        </div>
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col lg:pl-64">
         {/* TopNavBar */}
         <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-outline bg-surface-dim/85 px-4 backdrop-blur-md sm:px-8">
-          <div className="flex items-center gap-2 lg:hidden">
-            <span className="flex size-8 items-center justify-center rounded-lg border border-primary/40 bg-primary-soft">
-              <Icon name="hub" className="text-[18px] text-primary" />
-            </span>
-            <span className="font-bold tracking-tight text-content">Synergy</span>
-          </div>
+          <Logo size="sm" className="lg:hidden" />
 
-          <nav className="hidden items-center gap-1 lg:flex">
-            {items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cx(
-                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'text-secondary'
-                      : 'text-content-muted hover:text-content',
-                  )
-                }
+          {/*
+            Canto superior direito: tudo que é do próprio usuário. A navegação por
+            área do produto fica só na SideNavBar (e na BottomNavBar no mobile).
+          */}
+          {me ? (
+            <div className="relative ml-auto" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-surface-container-high"
               >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            {me ? (
-              <>
-                <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-content">{me.user.name}</p>
-                  <p className="text-[11px] tracking-wide text-content-muted uppercase">
+                <span className="hidden text-right sm:block">
+                  <span className="block text-sm font-semibold text-content">{me.user.name}</span>
+                  <span className="block text-[13px] tracking-wide text-content-muted uppercase">
                     {ROLE_LABEL[me.user.role]} · Nível {me.profile.level}
-                  </p>
-                </div>
+                  </span>
+                </span>
                 <Avatar name={me.user.name} tone="secondary" />
-              </>
-            ) : null}
-          </div>
+                <Icon
+                  name={menuOpen ? 'expand_less' : 'expand_more'}
+                  className="text-[20px] text-content-muted"
+                />
+              </button>
+
+              {menuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-outline bg-surface-container/95 shadow-glow-primary backdrop-blur-md"
+                >
+                  <NavLink
+                    to="/perfil"
+                    role="menuitem"
+                    onClick={() => setMenuOpen(false)}
+                    className={({ isActive }) =>
+                      cx(
+                        'flex items-center gap-2.5 px-4 py-3 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary-soft text-primary'
+                          : 'text-content hover:bg-surface-container-high',
+                      )
+                    }
+                  >
+                    <Icon name="account_circle" className="text-[20px]" />
+                    Meu perfil
+                  </NavLink>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 border-t border-outline px-4 py-3 text-sm font-medium text-content-muted transition-colors hover:bg-surface-container-high hover:text-danger"
+                  >
+                    <Icon name="logout" className="text-[20px]" />
+                    Sair
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <main className="flex-1 px-4 pt-6 pb-28 sm:px-8 lg:pb-10">
@@ -134,7 +165,7 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* BottomNavBar flutuante — mobile (DESIGN-SYSTEM.md seção 5.3) */}
+      {/* BottomNavBar flutuante — mobile, onde a SideNavBar fica oculta */}
       <nav className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-around rounded-2xl border border-outline bg-surface-container/90 px-2 py-2 backdrop-blur-md lg:hidden">
         {items.map((item) => (
           <NavLink
@@ -142,7 +173,7 @@ export function AppShell() {
             to={item.to}
             className={({ isActive }) =>
               cx(
-                'flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-medium transition-colors',
+                'flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[13px] font-medium transition-colors',
                 isActive ? 'bg-primary-soft text-primary' : 'text-content-muted',
               )
             }
@@ -151,14 +182,6 @@ export function AppShell() {
             {item.label}
           </NavLink>
         ))}
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-[11px] font-medium text-content-muted"
-        >
-          <Icon name="logout" className="text-[20px]" />
-          Sair
-        </button>
       </nav>
     </div>
   )

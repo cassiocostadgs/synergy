@@ -104,7 +104,7 @@ export function KpiCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-semibold tracking-[0.18em] text-content-muted uppercase">
+        <p className="text-[13px] font-semibold tracking-[0.18em] text-content-muted uppercase">
           {label}
         </p>
         {icon ? (
@@ -116,7 +116,7 @@ export function KpiCard({
       </div>
       <p
         className={cx(
-          'mt-3 text-4xl font-bold tracking-tight',
+          'font-display mt-3 text-4xl font-bold tracking-tight',
           isPrimary ? 'text-primary' : 'text-secondary',
         )}
       >
@@ -144,7 +144,7 @@ export function Badge({
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase',
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[13px] font-semibold tracking-wide uppercase',
         BADGE_TONES[tone],
       )}
     >
@@ -281,7 +281,7 @@ export function PageHeader({
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-content">{title}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight text-content">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-content-muted">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}

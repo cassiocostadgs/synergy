@@ -85,7 +85,9 @@ export function TeamsPage() {
           <Link key={team.id} to={`/times/${team.id}`} className="group">
             <Card className="h-full p-5 transition-all group-hover:border-primary/60 group-hover:shadow-glow-primary">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-bold tracking-tight text-content">{team.name}</h2>
+                <h2 className="font-display text-lg font-bold tracking-tight text-content">
+                  {team.name}
+                </h2>
                 <Badge tone={team.status === 'ACTIVE' ? 'success' : 'neutral'}>
                   {team.status === 'ACTIVE' ? 'Ativo' : 'Arquivado'}
                 </Badge>

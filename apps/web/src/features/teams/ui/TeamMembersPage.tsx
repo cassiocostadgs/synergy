@@ -131,7 +131,7 @@ export function TeamMembersPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-outline text-[11px] tracking-[0.14em] text-content-muted uppercase">
+              <tr className="border-b border-outline text-[13px] tracking-[0.14em] text-content-muted uppercase">
                 <th className="px-5 py-3 font-semibold">Membro</th>
                 <th className="px-5 py-3 font-semibold">Papel no time</th>
                 <th className="px-5 py-3 text-right font-semibold">Ações</th>
