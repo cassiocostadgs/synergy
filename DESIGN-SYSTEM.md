@@ -31,9 +31,10 @@ marca e uma techno legível para o conteúdo:
 O sistema utiliza um layout fixo com duas barras de navegação principais:
 
 ### 3.1. SideNavBar (Barra Lateral Esquerda)
-- **Largura:** `w-64` (fixa à esquerda, `h-screen`).
-- **Fundo:** `bg-surface-container-low` com borda divisória sutil.
-- **Cabeçalho da Sidebar:** apenas o logotipo "Synergy", sem subtítulo.
+- **Largura:** `w-52` (fixa à esquerda, altura total). Ajustada ao conteúdo — `w-64` deixava espaço vazio à direita dos rótulos.
+- **Fundo:** `bg-surface-container-low/80` com `backdrop-blur`, separado do conteúdo apenas pela borda direita.
+- **Sem divisórias horizontais internas:** o painel é um bloco único; nada de linhas cortando entre logotipo, navegação e rodapé.
+- **Cabeçalho da Sidebar:** apenas o logotipo "Synergy" (tamanho `sm`, que é o que cabe em `w-52`), sem subtítulo.
 - **Abas de Navegação:**
   - Ícones do Google Material Icons / Material Symbols.
   - Estado ativo: Fundo translúcido ou borda lateral destacada com a cor primária (`#ff2d78` ou `#00ffff`).
@@ -62,7 +63,15 @@ O sistema utiliza um layout fixo com duas barras de navegação principais:
 - **Cards de Insights:** Intensidade, Justiça, Excelência, Cuidado, Camaraderie, Evolução, Silos, Superação.
 - **Estilização:** Ícones temáticos, fundo escuro de container e bordas finas com glow ao passar o mouse (`hover:border-primary`).
 
-### 4.3. Tabelas de Gestão (RBAC / Usuários / Teams)
+### 4.3. Roleta de Sorteio (Dinâmicas)
+
+- **Setores:** paleta neon própria de 8 cores, cada uma com a cor de texto que preserva contraste sobre ela. As cores ciclam quando há mais setores que cores.
+- **Rótulos:** dispostos radialmente, invertidos 180° na metade esquerda da roda para não ficarem de cabeça para baixo; tamanho de fonte proporcional à quantidade de setores, e omitidos acima de 16 setores.
+- **Ponteiro:** fixo no topo, na cor primária — é ele que define o setor vencedor.
+- **Animação:** 5 voltas com `cubic-bezier(0.16, 1, 0.3, 1)` e glow neon no conjunto. Respeita `prefers-reduced-motion`, entregando o resultado sem giro.
+- **Regra de implementação:** o vencedor é sorteado **antes** da animação e a roda gira até ele. Nunca derive o vencedor do ângulo final.
+
+### 4.4. Tabelas de Gestão (RBAC / Usuários / Teams)
 - **Cabeçalho de Tabela:** Texto em maiúsculo, espaçamento organizado.
 - **Linhas:** Efeito hover sutil (`hover:bg-surface-container-high`), avatares com iniciais coloridas (ex: crachás circulares rosa/ciano), badges de status (`Active`, `Admin`, `User`) e botões de ação compactos (Visualizar, Editar, Excluir).
 

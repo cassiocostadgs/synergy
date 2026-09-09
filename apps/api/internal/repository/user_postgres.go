@@ -48,6 +48,28 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User, profile 
 	return tx.Commit(ctx)
 }
 
+func (r *UserRepository) UpdateName(ctx context.Context, userID uuid.UUID, name string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET name = $2 WHERE id = $1`, userID, name)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("usuário não encontrado")
+	}
+	return nil
+}
+
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE users SET password_hash = $2 WHERE id = $1`, userID, passwordHash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("usuário não encontrado")
+	}
+	return nil
+}
+
 const userColumns = `id, name, email, password_hash, role::text, created_at`
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
@@ -121,4 +143,18 @@ func (r *ProfileRepository) FindByUserID(ctx context.Context, userID uuid.UUID) 
 		return nil, translate(err, "conflito ao consultar perfil")
 	}
 	return &profile, nil
+}
+
+func (r *ProfileRepository) UpdateHobby(ctx context.Context, userID uuid.UUID, hobby string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE profiles
+		SET hobby = NULLIF($2, '')
+		WHERE user_id = $1`, userID, hobby)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("perfil não encontrado")
+	}
+	return nil
 }

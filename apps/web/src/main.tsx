@@ -7,6 +7,7 @@ import { RequireAuth, RequireRole } from '@/app/guards'
 import { AuthProvider } from '@/features/auth/hooks/useAuth'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { ProfilePage } from '@/features/profile/ui/ProfilePage'
+import { SorteioPage } from '@/features/sorteio/ui/SorteioPage'
 import { TeamMembersPage } from '@/features/teams/ui/TeamMembersPage'
 import { TeamsPage } from '@/features/teams/ui/TeamsPage'
 import { UsersPage } from '@/features/users/ui/UsersPage'
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')!).render(
               }
             />
             <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/sorteio" element={<SorteioPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/times" replace />} />

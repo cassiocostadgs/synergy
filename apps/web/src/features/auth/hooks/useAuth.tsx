@@ -16,7 +16,8 @@ interface AuthContextValue {
   me: Me | null
   /** true enquanto a sessão inicial é restaurada do token salvo. */
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  /** `lembrar` decide se a sessão sobrevive ao fechar o navegador. */
+  login: (email: string, password: string, lembrar?: boolean) => Promise<void>
   logout: () => void
   refresh: () => Promise<void>
 }
@@ -47,9 +48,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void refresh()
   }, [refresh])
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, lembrar = true) => {
     const result = await authApi.login(email, password)
-    setToken(result.token)
+    setToken(result.token, lembrar)
     setMe(await authApi.me())
   }, [])
 

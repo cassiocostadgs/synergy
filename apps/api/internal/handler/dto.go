@@ -14,6 +14,16 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type updateMeRequest struct {
+	Name  string `json:"name"`
+	Hobby string `json:"hobby"`
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 type createUserRequest struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`

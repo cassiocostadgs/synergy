@@ -50,7 +50,11 @@ function Invoke-SynergyBinary {
         try {
             # 'Stop' faz a falha de lançamento virar exceção capturável.
             $ErrorActionPreference = 'Stop'
-            if ($Arguments.Count -gt 0) { & $Path @Arguments } else { & $Path }
+            # Out-Host manda a saída do programa direto para o console. Sem isso
+            # ela entraria no pipeline da função e seria capturada junto com o
+            # exit code por quem atribui o retorno a uma variável — o que fazia
+            # testes aprovados serem reportados como falha.
+            if ($Arguments.Count -gt 0) { & $Path @Arguments | Out-Host } else { & $Path | Out-Host }
             return $LASTEXITCODE
         }
         catch {

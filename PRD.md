@@ -30,13 +30,66 @@ O MVP conta com 3 perfis de usuários com escopos de ação específicos:
 * **Funcionalidades:**
   * Cadastro, edição e arquivamento de times.
   * Painel de membros para adição, alteração de função (Papel) ou remoção.
-  
+  * No cadastro de um usuário, o Admin pode já vinculá-lo a um time ativo (opcional), escolhendo o papel de Colaborador ou Gestor de Apoio.
+
+### 3.2. Dinâmicas e Facilitação
+
+Módulo de ferramentas para conduzir rituais do time. Substitui o épico "Dinâmicas
+Management 3.0" que estava integralmente fora de escopo: a primeira entrega saiu, as
+práticas nomeadas continuam pendentes de especificação.
+
+> **Feature em avaliação (2026-09-09):** entra no produto para medir aderência. Se não
+> for adotada, será removida. A ausência de persistência é deliberada e mantém a remoção
+> barata — não há dado de usuário a migrar ou descartar.
+
+#### 3.2.1. Sorteio de Temas — **entregue**
+
+Roleta para escolher aleatoriamente o tema de uma conversa (retro, daily, reunião de time).
+
+* **Funcionalidades:**
+  * Lista de temas digitada na hora, um por linha, **sem persistência** — vale apenas para a sessão em uso.
+  * Roda visual com o resultado destacado.
+* **Regras de Negócio:**
+  * Cada tema aceita no máximo **20 caracteres**.
+  * A lista exige de **2 a 24 temas**; acima disso os setores da roda ficam ilegíveis.
+  * Temas repetidos são rejeitados, pois duplicata enviesa o sorteio.
+  * O sorteio é **uniforme** e o vencedor é definido **antes** da animação — a roda é girada até ele. O caminho inverso (ler o ângulo final para descobrir o vencedor) pode exibir um setor diferente do resultado anunciado.
+* **Acesso:** hoje disponível a **qualquer usuário autenticado**, sem restrição de papel — decisão a revisar se o módulo for adotado.
+
+#### 3.2.2. Práticas Management 3.0 — **não especificadas**
+
+Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo
+de dados ou tela. Ver seção 5.
+
+### 3.3. Autogestão de Conta
+
+Disponível a **qualquer usuário autenticado**, independente do papel — cada pessoa cuida
+do próprio cadastro sem depender do Admin.
+
+* **Funcionalidades:**
+  * Editar **nome** e **hobby** na tela de perfil.
+  * Trocar a **própria senha**, informando obrigatoriamente a senha atual.
+  * Escolher no login se a sessão **persiste no dispositivo** ou é encerrada ao fechar o navegador (útil em computador compartilhado).
+* **Regras de Negócio:**
+  * A nova senha exige no mínimo **8 caracteres** e precisa ser **diferente da atual**.
+  * Senha atual incorreta é recusada, sem alterar nada.
+  * Nome é obrigatório; nome e hobby aceitam até **120 caracteres**.
+* **XP e nível não são exibidos.** Os campos existem no modelo (seção 4) e vêm na resposta de `GET /me`, mas nenhuma regra os altera — todo usuário ficaria permanentemente em "nível 1 / 0 XP". Exibir isso passa impressão de recurso quebrado, então a interface só voltará a mostrá-los quando a Gamificação tiver regras (ver seção 5).
+* **Deliberadamente não editáveis pelo próprio usuário:**
+  * **E-mail** — é a identidade de login. Trocá-lo sem confirmação permitiria mover a conta para um endereço não controlado pela pessoa, ou colidir com outro cadastro.
+  * **Papel global** — seria escalada de privilégio.
+  * **XP e nível** — seria burla da gamificação.
+* **Limitação conhecida:** trocar a senha **não invalida os tokens já emitidos**; eles seguem válidos até expirar. Revogar sessões exigiria lista de bloqueio ou versionamento de credencial.
+* **Fora de escopo:** recuperação de senha por e-mail ("esqueci minha senha") e reset de senha de terceiros pelo Admin. Sem isso, um usuário que perca a senha depende de intervenção direta no banco.
 
 ---
 
 ## 4. Estrutura de Dados Preliminar
 
 > **Banco de dados:** PostgreSQL (acessado via GORM/pgx no backend, conforme `CLAUDE.md`).
+>
+> O Sorteio de Temas (seção 3.2.1) **não possui modelo de dados**: a lista vive no navegador
+> durante a sessão e nada é gravado.
 
 
 enum Role {
@@ -103,4 +156,8 @@ Itens abaixo foram deliberadamente descopados desta primeira entrega (decisões 
 * **Papel Auditor:** reservado no enum `Role`, sem regras de permissão implementadas no MVP.
 * **Dashboard / Behavioral Insights:** o `DESIGN-SYSTEM.md` já especifica os componentes visuais (KPI Cards, grade de insights comportamentais), mas nenhuma regra de negócio, fonte de dado ou tela real entra neste MVP — apenas o componente de KPI Card genérico é construído, sem dado de produto por trás.
 * **Módulo de Metas (Goal):** avaliação e acompanhamento de metas citados na visão geral e na matriz de RBAC, mas sem modelo de dados nem épico detalhado nesta versão.
-* **Dinâmicas Management 3.0:** inclui práticas como Moving Motivators, Kudo Box, Niko-Niko e Personal Map — citadas na visão geral, mas sem épico nesta versão do PRD.
+* **Gamificação (regras de XP e nível):** os campos `xp` e `level` existem no `Profile` desde a primeira versão, mas **nunca são alterados** — não há regra que defina o que gera XP, quanto vale cada evento, nem a curva de nível. Por isso não são exibidos na interface (seção 3.3). Especificar isso depende de Metas e Dinâmicas, já que os candidatos naturais a gerar XP (meta concluída, participação em dinâmica, kudo recebido) vivem nesses épicos.
+* **Práticas Management 3.0 nomeadas:** Moving Motivators, Kudo Box, Niko-Niko e Personal Map continuam sem especificação. O módulo de Dinâmicas (seção 3.2) deixou de estar integralmente fora de escopo — o Sorteio de Temas foi entregue —, mas estas quatro práticas seguem pendentes.
+* **Persistência do Sorteio de Temas:** a lista de temas não é salva. Ficam em aberto, caso o módulo prove aderência: temas cadastrados por time, histórico de sorteios (para não repetir tema toda semana) e restrição de quem pode sortear.
+* **Recuperação de senha:** não há fluxo de "esqueci minha senha" nem reset pelo Admin (ver seção 3.3). É bloqueador para produção — hoje quem perde a senha depende de alteração direta no banco.
+* **Revogação de sessão:** trocar a senha não invalida tokens já emitidos. Exigiria lista de bloqueio ou versionamento de credencial no JWT.

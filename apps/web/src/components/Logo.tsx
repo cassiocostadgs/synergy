@@ -5,10 +5,14 @@ import { cx } from '@/components/ui'
 /**
  * Identidade visual do Synergy.
  *
- * O símbolo é uma moldura hexagonal (linguagem de HUD) com três nós ligados em
- * triângulo — a ideia de sinergia: partes distintas conectadas formando um todo.
- * O nó de cima usa o rosa primário e os de baixo o ciano secundário, sobre um
- * traço em gradiente entre as duas cores do tema.
+ * O símbolo é uma moldura hexagonal (linguagem de HUD) com duas circunferências
+ * que se sobrepõem — rosa primário à esquerda, ciano secundário à direita — e a
+ * interseção preenchida: sinergia como duas partes que, juntas, produzem algo
+ * que nenhuma tinha sozinha.
+ *
+ * A composição é simétrica no eixo horizontal de propósito: o desenho anterior
+ * usava três nós ligados em triângulo e a silhueta vertical resultante era
+ * ambígua.
  */
 
 type LogoSize = 'sm' | 'md' | 'lg'
@@ -57,20 +61,15 @@ export function LogoMark({ size = 'md', className }: { size?: LogoSize; classNam
         strokeLinejoin="round"
       />
 
-      {/* Ligações entre os nós */}
-      <path
-        d="M16 9 L22.06 19.5 L9.94 19.5 Z"
-        fill="none"
-        stroke={`url(#${gradientId})`}
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-        opacity="0.5"
-      />
+      {/* As duas partes */}
+      <circle cx="12.8" cy="16" r="5.5" fill="none" stroke="#ff2d78" strokeWidth="1.6" />
+      <circle cx="19.2" cy="16" r="5.5" fill="none" stroke="#00fbfb" strokeWidth="1.6" />
 
-      {/* Nós */}
-      <circle cx="16" cy="9" r="2.7" fill="#ff2d78" />
-      <circle cx="22.06" cy="19.5" r="2.7" fill="#00fbfb" />
-      <circle cx="9.94" cy="19.5" r="2.7" fill="#00fbfb" />
+      {/* A interseção: o que só existe quando as duas se somam */}
+      <path
+        d="M16,11.527 A5.5,5.5 0 0 1 16,20.473 A5.5,5.5 0 0 1 16,11.527 Z"
+        fill={`url(#${gradientId})`}
+      />
     </svg>
   )
 }

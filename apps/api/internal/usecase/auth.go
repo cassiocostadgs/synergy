@@ -107,6 +107,86 @@ func (uc *AuthUseCase) Me(ctx context.Context, actor domain.Actor) (*MeOutput, e
 	return &MeOutput{User: user, Profile: profile}, nil
 }
 
+// Limites de tamanho dos campos que o usuário edita livremente.
+const (
+	maxNomeRunas  = 120
+	maxHobbyRunas = 120
+	minSenha      = 8
+)
+
+// UpdateMeInput descreve os dados que o próprio usuário pode alterar.
+//
+// E-mail fica fora de propósito: é a identidade de login, e trocá-lo sem um
+// fluxo de confirmação permitiria alguém se mover para um endereço que não
+// controla (ou colidir com outro cadastro). Papel e XP também não entram —
+// seriam escalada de privilégio e burla da gamificação.
+type UpdateMeInput struct {
+	Name  string
+	Hobby string
+}
+
+// UpdateMe altera os dados cadastrais do próprio usuário autenticado.
+func (uc *AuthUseCase) UpdateMe(ctx context.Context, actor domain.Actor, input UpdateMeInput) (*MeOutput, error) {
+	name := strings.TrimSpace(input.Name)
+	hobby := strings.TrimSpace(input.Hobby)
+
+	switch {
+	case name == "":
+		return nil, domain.Validation("o nome é obrigatório")
+	case len([]rune(name)) > maxNomeRunas:
+		return nil, domain.Validation("o nome deve ter até %d caracteres", maxNomeRunas)
+	case len([]rune(hobby)) > maxHobbyRunas:
+		return nil, domain.Validation("o hobby deve ter até %d caracteres", maxHobbyRunas)
+	}
+
+	if err := uc.users.UpdateName(ctx, actor.UserID, name); err != nil {
+		if domain.IsNotFound(err) {
+			return nil, domain.NotFound("usuário não encontrado")
+		}
+		return nil, err
+	}
+	if err := uc.profiles.UpdateHobby(ctx, actor.UserID, hobby); err != nil && !domain.IsNotFound(err) {
+		// Perfil ausente não impede a alteração do nome, que já foi gravada.
+		return nil, err
+	}
+
+	return uc.Me(ctx, actor)
+}
+
+// ChangePassword troca a senha do próprio usuário, exigindo a senha atual.
+//
+// Atenção: os tokens já emitidos continuam válidos até expirar. Revogar sessão
+// exigiria uma lista de bloqueio ou versionamento de credencial, o que está fora
+// do escopo desta entrega.
+func (uc *AuthUseCase) ChangePassword(ctx context.Context, actor domain.Actor, senhaAtual, novaSenha string) error {
+	switch {
+	case senhaAtual == "":
+		return domain.Validation("informe a senha atual")
+	case len(novaSenha) < minSenha:
+		return domain.Validation("a nova senha deve ter ao menos %d caracteres", minSenha)
+	case novaSenha == senhaAtual:
+		return domain.Validation("a nova senha deve ser diferente da atual")
+	}
+
+	user, err := uc.users.FindByID(ctx, actor.UserID)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return domain.NotFound("usuário não encontrado")
+		}
+		return err
+	}
+
+	if err := uc.hasher.Compare(user.PasswordHash, senhaAtual); err != nil {
+		return domain.Unauthorized("a senha atual está incorreta")
+	}
+
+	hash, err := uc.hasher.Hash(novaSenha)
+	if err != nil {
+		return err
+	}
+	return uc.users.UpdatePassword(ctx, actor.UserID, hash)
+}
+
 // CreateUserInput descreve o cadastro de um novo usuário pelo Admin.
 type CreateUserInput struct {
 	Name     string
@@ -130,8 +210,8 @@ func (uc *AuthUseCase) CreateUser(ctx context.Context, actor domain.Actor, input
 		return nil, domain.Validation("o nome é obrigatório")
 	case !strings.Contains(email, "@"):
 		return nil, domain.Validation("e-mail inválido")
-	case len(input.Password) < 8:
-		return nil, domain.Validation("a senha deve ter ao menos 8 caracteres")
+	case len(input.Password) < minSenha:
+		return nil, domain.Validation("a senha deve ter ao menos %d caracteres", minSenha)
 	}
 
 	role := input.Role

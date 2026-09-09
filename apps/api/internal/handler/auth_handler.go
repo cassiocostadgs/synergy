@@ -54,6 +54,54 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, toMeResponse(out))
 }
 
+// UpdateMe — PATCH /api/v1/me (o usuário edita os próprios dados)
+func (h *AuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	var req updateMeRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	out, err := h.auth.UpdateMe(r.Context(), actor, usecase.UpdateMeInput{
+		Name:  req.Name,
+		Hobby: req.Hobby,
+	})
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, toMeResponse(out))
+}
+
+// ChangePassword — PATCH /api/v1/me/password (exige a senha atual)
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	var req changePasswordRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	if err := h.auth.ChangePassword(r.Context(), actor, req.CurrentPassword, req.NewPassword); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // CreateUser — POST /api/v1/users (restrito ao Admin)
 func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	actor, err := requireActor(r)

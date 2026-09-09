@@ -23,7 +23,7 @@ synergy/
 │       └── src/
 │           ├── app/          # App Shell (navegação) e guards de rota
 │           ├── components/   # Componentes de UI genéricos (Design System)
-│           ├── features/     # Módulos por domínio (auth, teams, users, profile)
+│           ├── features/     # Módulos por domínio (auth, teams, users, profile, sorteio)
 │           │   ├── api/      # Chamadas de API específicas
 │           │   ├── hooks/    # Custom hooks da feature
 │           │   └── ui/       # Componentes visuais da feature

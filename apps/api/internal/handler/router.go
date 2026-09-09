@@ -68,7 +68,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		api.Group(func(protected chi.Router) {
 			protected.Use(RequireAuth(cfg.TokenParser))
 
+			// Autogestão do próprio cadastro: qualquer papel autenticado.
 			protected.Get("/me", authHandler.Me)
+			protected.Patch("/me", authHandler.UpdateMe)
+			protected.Patch("/me/password", authHandler.ChangePassword)
 
 			// Cadastro de usuários é exclusivo do Admin (PRD seção 2);
 			// a listagem também atende o Gestor, que precisa montar seu time.

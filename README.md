@@ -219,6 +219,8 @@ handler  →  usecase  →  domain  ←  repository
 | GET | `/health` | público |
 | POST | `/api/v1/auth/login` | público |
 | GET | `/api/v1/me` | autenticado |
+| PATCH | `/api/v1/me` | autenticado — edita nome e hobby próprios |
+| PATCH | `/api/v1/me/password` | autenticado — troca a própria senha (exige a atual) |
 | GET | `/api/v1/users` | Admin, Gestor |
 | POST | `/api/v1/users` | Admin |
 | GET | `/api/v1/teams` | autenticado (Admin vê todos) |

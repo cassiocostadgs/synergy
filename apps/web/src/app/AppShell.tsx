@@ -18,6 +18,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/times', label: 'Times', icon: 'groups' },
   { to: '/usuarios', label: 'Usuários', icon: 'badge', roles: ['ADMIN', 'GESTOR'] },
+  { to: '/sorteio', label: 'Sorteio', icon: 'casino' },
 ]
 
 function visibleItems(role: Role | undefined): NavItem[] {
@@ -41,12 +42,17 @@ export function AppShell() {
   return (
     <div className="min-h-screen lg:flex">
       {/* SideNavBar — desktop */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-outline bg-surface-container-low/80 backdrop-blur-sm lg:flex">
-        <div className="border-b border-outline px-6 py-5">
-          <Logo size="md" />
+      {/*
+        Largura ajustada ao conteúdo (w-52): com w-64 sobrava espaço vazio à
+        direita dos rótulos. Sem divisórias horizontais internas — o painel é um
+        bloco único, separado do conteúdo apenas pela borda direita e pelo fundo.
+      */}
+      <aside className="fixed inset-y-0 left-0 hidden w-52 flex-col border-r border-outline bg-surface-container-low/80 backdrop-blur-sm lg:flex">
+        <div className="px-4 py-5">
+          <Logo size="sm" />
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 space-y-1 px-3 py-2">
           {items.map((item) => (
             <NavLink
               key={item.to}
@@ -67,7 +73,7 @@ export function AppShell() {
         </nav>
 
         {/* Rodapé: encerrar sessão fica no canto inferior esquerdo. */}
-        <div className="border-t border-outline px-3 py-4">
+        <div className="px-3 py-4">
           <button
             type="button"
             onClick={handleLogout}
@@ -79,7 +85,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-h-screen flex-1 flex-col lg:pl-64">
+      <div className="flex min-h-screen flex-1 flex-col lg:pl-52">
         {/* TopNavBar */}
         <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-outline bg-surface-dim/85 px-4 backdrop-blur-md sm:px-8">
           <Logo size="sm" className="lg:hidden" />
@@ -98,8 +104,10 @@ export function AppShell() {
             >
               <span className="hidden text-right sm:block">
                 <span className="block text-sm font-semibold text-content">{me.user.name}</span>
+                {/* Sem "Nível N": a gamificação não tem regra que altere o
+                    nível, então o valor seria sempre 1 (PRD seção 5). */}
                 <span className="block text-[13px] tracking-wide text-content-muted uppercase">
-                  {ROLE_LABEL[me.user.role]} · Nível {me.profile.level}
+                  {ROLE_LABEL[me.user.role]}
                 </span>
               </span>
               <Avatar name={me.user.name} tone="secondary" />

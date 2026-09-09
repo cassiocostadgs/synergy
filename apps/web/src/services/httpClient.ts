@@ -33,15 +33,35 @@ export class ApiError extends Error {
   }
 }
 
+/*
+ * Onde o token fica depende do "lembrar-me" do login:
+ *   localStorage   -> sobrevive a fechar o navegador
+ *   sessionStorage -> morre ao fechar a aba/janela (máquina compartilhada)
+ *
+ * A leitura procura nos dois, e a escrita sempre limpa o outro para não deixar
+ * duas sessões concorrentes gravadas.
+ *
+ * Os acessos vão em try/catch porque em janela privada ou com cookies de site
+ * bloqueados o próprio acessor lança exceção.
+ */
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
 }
 
-export function setToken(token: string | null): void {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token)
-  } else {
+export function setToken(token: string | null, lembrar = true): void {
+  try {
     localStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
+    if (token) {
+      const store = lembrar ? localStorage : sessionStorage
+      store.setItem(TOKEN_KEY, token)
+    }
+  } catch {
+    // Sem armazenamento disponível a sessão vale só para esta navegação.
   }
 }
 

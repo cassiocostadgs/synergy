@@ -12,11 +12,18 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	List(ctx context.Context) ([]User, error)
+	// UpdateName altera o nome de exibição do usuário.
+	UpdateName(ctx context.Context, userID uuid.UUID, name string) error
+	// UpdatePassword grava um novo hash de senha. Recebe o hash pronto: a
+	// escolha do algoritmo é da camada de infraestrutura, não do domínio.
+	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 }
 
 // ProfileRepository abstrai a persistência do perfil/gamificação.
 type ProfileRepository interface {
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*Profile, error)
+	// UpdateHobby grava o hobby do perfil; string vazia limpa o campo.
+	UpdateHobby(ctx context.Context, userID uuid.UUID, hobby string) error
 }
 
 // TeamRepository abstrai a persistência de times.

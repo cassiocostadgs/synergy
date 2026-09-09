@@ -64,6 +64,24 @@ func (r fakeUserRepo) FindByEmail(_ context.Context, email string) (*domain.User
 	return nil, domain.NotFound("usuário não encontrado")
 }
 
+func (r fakeUserRepo) UpdateName(_ context.Context, id uuid.UUID, name string) error {
+	user, ok := r.store.users[id]
+	if !ok {
+		return domain.NotFound("usuário não encontrado")
+	}
+	user.Name = name
+	return nil
+}
+
+func (r fakeUserRepo) UpdatePassword(_ context.Context, id uuid.UUID, passwordHash string) error {
+	user, ok := r.store.users[id]
+	if !ok {
+		return domain.NotFound("usuário não encontrado")
+	}
+	user.PasswordHash = passwordHash
+	return nil
+}
+
 func (r fakeUserRepo) List(_ context.Context) ([]domain.User, error) {
 	out := make([]domain.User, 0, len(r.store.users))
 	for _, user := range r.store.users {
@@ -84,6 +102,15 @@ func (r fakeProfileRepo) FindByUserID(_ context.Context, userID uuid.UUID) (*dom
 	}
 	copyProfile := *profile
 	return &copyProfile, nil
+}
+
+func (r fakeProfileRepo) UpdateHobby(_ context.Context, userID uuid.UUID, hobby string) error {
+	profile, ok := r.store.profiles[userID]
+	if !ok {
+		return domain.NotFound("perfil não encontrado")
+	}
+	profile.Hobby = hobby
+	return nil
 }
 
 // --- TeamRepository ---
@@ -241,16 +268,39 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-// newUser cria um usuário no store e devolve o Actor correspondente.
+// senhaPadrao é usada pelos usuários criados sem senha explícita.
+const senhaPadrao = "senha-de-teste"
+
+// newUser cria um usuário (com perfil e senha padrão) e devolve o Actor.
 func (h *harness) newUser(name string, role domain.Role) domain.Actor {
 	h.t.Helper()
+	return h.newUserComSenha(name, role, senhaPadrao)
+}
+
+// newUserComSenha permite testar os fluxos de autenticação e troca de senha.
+func (h *harness) newUserComSenha(name string, role domain.Role, senha string) domain.Actor {
+	h.t.Helper()
 	id := uuid.New()
-	h.store.users[id] = &domain.User{
-		ID:    id,
-		Name:  name,
-		Email: strings.ToLower(name) + "@synergy.dev",
-		Role:  role,
+
+	hash, err := stubHasher{}.Hash(senha)
+	if err != nil {
+		h.t.Fatalf("newUserComSenha(%q): %v", name, err)
 	}
+
+	h.store.users[id] = &domain.User{
+		ID:           id,
+		Name:         name,
+		Email:        strings.ToLower(name) + "@synergy.dev",
+		PasswordHash: hash,
+		Role:         role,
+	}
+	h.store.profiles[id] = &domain.Profile{
+		ID:     uuid.New(),
+		UserID: id,
+		XP:     0,
+		Level:  1,
+	}
+
 	return domain.Actor{UserID: id, Role: role}
 }
 

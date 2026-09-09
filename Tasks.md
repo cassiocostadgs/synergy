@@ -9,7 +9,13 @@
 > - Papel **Auditor** fora do MVP (reservado no enum, sem regras de permissão).
 > - Épico **Dashboard/Behavioral Insights** pós-MVP (só o componente visual de KPI Card entra agora).
 >
-> **Status da implementação (2026-09-08):** Fases 0–4 concluídas e verificadas; Fase 5 parcial.
+> **Revisão de escopo (2026-09-09):** o épico de **Dinâmicas** deixou de estar integralmente
+> fora do MVP. O **Sorteio de Temas** entrou como *feature em avaliação* — se não tiver
+> aderência, será removida; foi entregue sem persistência de propósito, o que mantém a
+> remoção barata. Ver Fase 4.1 e `PRD.md` seção 3.2. As quatro práticas nomeadas (Kudo Box,
+> Niko-Niko, Personal Map e Moving Motivators) e o módulo de **Metas** continuam fora de escopo.
+>
+> **Status da implementação (2026-09-09):** Fases 0–4.1 concluídas e verificadas; Fase 5 parcial.
 > Ver [Estado da verificação](#-estado-da-verificação) ao final.
 
 ---
@@ -91,7 +97,7 @@
 - [x] `hooks/`: `useTeams`, `useTeamMembers` (loading, erro e recarga)
 - [x] `ui/TeamsPage`: listagem de times + KPIs + criação
 - [x] `ui/`: formulário de criação e de renomeação de time
-- [x] `ui/TeamMembersPage`: painel de membros (tabela do padrão 4.3 do Design System)
+- [x] `ui/TeamMembersPage`: painel de membros (tabela do padrão 4.4 do Design System)
   - [x] Ações: adicionar, alterar papel, transferir liderança, remover
   - [x] Badges de papel e status do time
 - [x] Feedback de erro da API refletindo as violações de RN1/RN2 na tela
@@ -106,7 +112,60 @@
 - [x] `BottomNavBar` flutuante no mobile
 - [x] Componente `KPI Card` genérico (glassmorphism + glow) reutilizável
 - [x] Tema dark aplicado globalmente com a paleta e a malha futurista de fundo
-- [x] Tela de perfil exibindo XP/Level
+- [x] ~~Tela de perfil exibindo XP/Level~~ → **revertido em 2026-09-09.** Os widgets de nível,
+      experiência e barra de progresso foram removidos do perfil (e o "Nível N" do cabeçalho):
+      nenhum caminho de código altera XP ou nível, então todo usuário exibiria "nível 1 / 0 XP"
+      para sempre, e a régua de progresso era um valor arbitrário meu, não regra de produto.
+      O dado continua no banco e em `GET /me`; a tela volta quando a Gamificação for especificada.
+
+---
+
+## Fase 4.1 — Épico: Dinâmicas e Facilitação (PRD seção 3.2)
+
+Escopo entrou depois do planejamento inicial, como **feature em avaliação**: se não houver
+aderência, é removida. Por isso nasceu sem persistência — a remoção não deixa dado órfão.
+
+### Sorteio de Temas — concluído
+- [x] Rota `/sorteio` e item "Sorteio" no menu lateral (visível a todos os papéis)
+- [x] Roleta em SVG com a paleta neon, ponteiro fixo e resultado destacado
+- [x] Vencedor sorteado **antes** da animação; a roda gira até ele
+  - [x] Verificado por cálculo independente: 897 casos (2–24 temas, 3 rodadas), zero divergência entre o sorteado e o setor sob o ponteiro
+  - [x] Rotação sempre progride para frente entre sorteios
+  - [x] Distribuição uniforme conferida (300 mil sorteios, desvio máximo 0,32%)
+- [x] Validações: até 20 caracteres por tema, de 2 a 24 temas, sem repetidos, linhas vazias ignoradas
+- [x] Rótulos invertidos na metade esquerda da roda e fonte proporcional à quantidade de setores
+- [x] Roda congelada durante o giro (editar o texto no meio da animação não faz o resultado divergir do desenho)
+- [x] Acessibilidade: resultado anunciado via `aria-live`; `prefers-reduced-motion` entrega o resultado sem animação, com aviso na tela
+
+### Pendências, caso o módulo prove aderência
+- [ ] Decidir quem pode sortear (hoje é qualquer usuário autenticado, sem restrição de papel)
+- [ ] Temas cadastrados por time, para não redigitar a cada ritual
+- [ ] Histórico de sorteios (evitar repetir tema toda semana)
+- [ ] Testes automatizados da fórmula de rotação e das validações (hoje verificados por script pontual, fora da suíte)
+
+### Práticas Management 3.0 — fora de escopo
+- [ ] Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo de dados ou tela (PRD seção 5)
+
+---
+
+## Fase 4.2 — Autogestão de Conta (PRD seção 3.3)
+
+- [x] `PATCH /api/v1/me` — usuário edita nome e hobby próprios
+- [x] `PATCH /api/v1/me/password` — troca da própria senha exigindo a atual
+- [x] `domain`: `UpdateName`, `UpdatePassword` e `UpdateHobby` nas interfaces de repositório
+- [x] `repository`: implementação PostgreSQL dos três métodos
+- [x] `usecase`: `UpdateMe` e `ChangePassword`, com as validações (nome obrigatório, 120 caracteres, senha mínima de 8, nova diferente da atual)
+- [x] E-mail, papel global e XP fora do que o próprio usuário pode alterar (`UpdateMeInput` não expõe esses campos)
+- [x] Frontend: formulários de dados e de senha na tela de perfil
+- [x] Frontend: "Manter sessão neste dispositivo" no login — `localStorage` quando marcado, `sessionStorage` quando não
+- [x] Frontend: Credential Management API para o navegador oferecer salvar a senha (Chrome/Edge; degrada silenciosamente onde não há suporte)
+- [x] **19 testes unitários** novos de autenticação, perfil e cadastro (total do backend: **51**)
+
+### Pendências relacionadas
+- [ ] Recuperação de senha por e-mail ("esqueci minha senha") — **bloqueador para produção**
+- [ ] Reset de senha de terceiros pelo Admin
+- [ ] Revogação de sessão ao trocar a senha (hoje os tokens emitidos seguem válidos até expirar)
+- [ ] Troca de e-mail com fluxo de confirmação
 
 ---
 
@@ -126,12 +185,18 @@
 
 | Item | Como foi verificado |
 | :--- | :--- |
-| Regras RN1/RN2 | `go test` — 32 testes unitários, todos passando |
+| Regras RN1/RN2 | 32 testes unitários, todos passando |
+| Autenticação, perfil e cadastro | 19 testes unitários (login, `UpdateMe`, `ChangePassword`, `CreateUser`) — **51 no total**, todos passando |
+| Autogestão ponta a ponta | fluxo real por HTTP com um Colaborador: edição de nome/hobby com trim, validações (400/401), troca de senha e confirmação de que a nova autentica e a antiga não |
 | Compilação do backend | `go build ./...` e `go vet ./...` sem erros |
 | Migrations + persistência | aplicadas em PostgreSQL 17 real; tabelas conferidas |
 | API ponta a ponta | fluxo completo por HTTP: login → cria usuários → cria time → adiciona membros → violações barradas (403/409) → transferência de liderança |
 | Build do frontend | `tsc -b && vite build` sem erros; `oxlint` só com warnings |
 | Integração front↔API | preflight CORS e login a partir da origem `http://localhost:5173` |
+| Sorteio de Temas — rotação | script independente: 897 casos (2–24 temas, 3 rodadas), zero divergência entre o vencedor sorteado e o setor sob o ponteiro; rotação sempre progressiva |
+| Sorteio de Temas — distribuição | 300 mil sorteios com 5 temas, desvio máximo de 0,32% |
+| Sorteio de Temas — validações | 9 casos de borda conferidos (limite exato de 20 caracteres, mínimo, máximo, duplicados, linhas vazias) |
+| Vínculo de time no cadastro | fluxo real por HTTP, incluindo a falha parcial (usuário criado com `201` e vínculo recusado com `409`) |
 | **Renderização da UI** | **não verificada em navegador** — sem browser headless no ambiente. Abrir `http://localhost:5173` para conferir visualmente. |
 
 ---
