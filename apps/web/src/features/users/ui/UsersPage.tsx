@@ -14,9 +14,17 @@ import {
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { teamsApi } from '@/features/teams/api/teamsApi'
 import { useResource } from '@/hooks/useResource'
 import { ApiError } from '@/services/httpClient'
-import { ROLE_LABEL, type Role, type User } from '@/types'
+import {
+  ROLE_LABEL,
+  TEAM_ROLE_LABEL,
+  type Role,
+  type Team,
+  type TeamRole,
+  type User,
+} from '@/types'
 
 const ROLE_TONE: Record<Role, 'primary' | 'secondary' | 'neutral'> = {
   ADMIN: 'primary',
@@ -101,6 +109,7 @@ export function UsersPage() {
           setDialogOpen(false)
           void reload()
         }}
+        onReload={() => void reload()}
       />
     </>
   )
@@ -110,34 +119,76 @@ function CreateUserDialog({
   open,
   onClose,
   onCreated,
+  onReload,
 }: {
   open: boolean
   onClose: () => void
+  /** Recarrega a lista e fecha o diálogo. */
   onCreated: () => void
+  /** Recarrega a lista mantendo o diálogo aberto (falha parcial). */
+  onReload: () => void
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('COLABORADOR')
+  const [teamId, setTeamId] = useState('')
+  const [teamRole, setTeamRole] = useState<TeamRole>('COLABORADOR')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  // Times arquivados não aceitam alteração de membros, então nem são oferecidos.
+  const { data: teams } = useResource<Team[]>(teamsApi.list, open)
+  const activeTeams = (teams ?? []).filter((team) => team.status === 'ACTIVE')
+
+  // Gestor de Apoio exige papel global de Gestor ou Admin (regra do backend),
+  // então a opção só aparece quando o papel escolhido permite.
+  const canBeSupportManager = role === 'GESTOR' || role === 'ADMIN'
+
+  function resetForm() {
+    setName('')
+    setEmail('')
+    setPassword('')
+    setRole('COLABORADOR')
+    setTeamId('')
+    setTeamRole('COLABORADOR')
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
     setSubmitting(true)
+
+    let created
     try {
-      await authApi.createUser({ name, email, password, role })
-      setName('')
-      setEmail('')
-      setPassword('')
-      setRole('COLABORADOR')
-      onCreated()
+      created = await authApi.createUser({ name, email, password, role })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível criar o usuário')
-    } finally {
       setSubmitting(false)
+      return
     }
+
+    // O vínculo é uma segunda chamada — a API não tem endpoint que crie o usuário
+    // já dentro do time. Se ela falhar, o usuário já existe, então avisamos disso
+    // explicitamente em vez de fazer parecer que nada aconteceu.
+    if (teamId) {
+      try {
+        await teamsApi.addMember(teamId, created.id, teamRole)
+      } catch (err) {
+        const motivo = err instanceof ApiError ? err.message : 'erro inesperado'
+        setError(
+          `Usuário ${created.name} foi criado, mas o vínculo com o time falhou: ${motivo}. ` +
+            'Adicione-o pelo painel de membros do time.',
+        )
+        setSubmitting(false)
+        onReload()
+        return
+      }
+    }
+
+    setSubmitting(false)
+    resetForm()
+    onCreated()
   }
 
   return (
@@ -168,12 +219,51 @@ function CreateUserDialog({
         <Select
           label="Papel global"
           value={role}
-          onChange={(event) => setRole(event.target.value as Role)}
+          onChange={(event) => {
+            const novoPapel = event.target.value as Role
+            setRole(novoPapel)
+            // Colaborador global não pode ser Gestor de Apoio de um time.
+            if (novoPapel === 'COLABORADOR') setTeamRole('COLABORADOR')
+          }}
         >
           <option value="COLABORADOR">Colaborador</option>
           <option value="GESTOR">Gestor</option>
           <option value="ADMIN">Admin</option>
         </Select>
+
+        <div className="space-y-4 rounded-lg border border-outline bg-surface-dim/60 p-3">
+          <Select
+            label="Vincular a um time (opcional)"
+            value={teamId}
+            onChange={(event) => setTeamId(event.target.value)}
+          >
+            <option value="">Não vincular agora</option>
+            {activeTeams.map((team) => (
+              <option key={team.id} value={team.id}>
+                {team.name}
+              </option>
+            ))}
+          </Select>
+
+          {teamId ? (
+            <>
+              <Select
+                label="Papel no time"
+                value={teamRole}
+                onChange={(event) => setTeamRole(event.target.value as TeamRole)}
+              >
+                <option value="COLABORADOR">{TEAM_ROLE_LABEL.COLABORADOR}</option>
+                {canBeSupportManager ? (
+                  <option value="GESTOR_APOIO">{TEAM_ROLE_LABEL.GESTOR_APOIO}</option>
+                ) : null}
+              </Select>
+              <p className="text-xs text-content-muted">
+                O Gestor Principal é definido na criação do time e só muda por transferência de
+                liderança. O time admite <strong className="text-secondary">1 Gestor de Apoio</strong>.
+              </p>
+            </>
+          ) : null}
+        </div>
 
         {error ? <ErrorBanner message={error} /> : null}
 
