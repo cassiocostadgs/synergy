@@ -3,9 +3,23 @@
 Hub de engajamento e gestão para times remotos. Este repositório é um monorepo com o
 backend em Go (`apps/api`) e o frontend em React (`apps/web`).
 
-O escopo desta entrega é o **Épico 3.1 — Gestão de Times e Membros** com RBAC e o App
-Shell do Design System "Neon Tokyo". Metas, Dinâmicas e Dashboard estão fora do MVP
-(ver `PRD.md`, seção 5).
+## O que está entregue
+
+| Módulo | PRD |
+| :--- | :--- |
+| Times e membros, com RBAC e as regras de liderança (RN1/RN2) | 3.1 |
+| Sorteio de Temas e Brackets — dinâmicas sem persistência | 3.2.1 e 3.2.2 |
+| Moving Motivators, com revisão a cada 90 dias | 3.2.3 |
+| Radar do Time — agregado e mapa de calor individual | 3.2.4 |
+| Autogestão de conta: dados próprios e troca de senha | 3.3 |
+| Gestão de acessos pelo Admin: papel, senha de terceiros e inativação | 3.4.1 a 3.4.3 |
+| Login com SSO da Microsoft (Entra ID), opcional | 3.4.4 |
+
+Fora do MVP: **Metas**, **Dashboard / Behavioral Insights**, as demais práticas do
+Management 3.0 (Kudo Box, Niko-Niko, Personal Map), o papel **Auditor** e as regras de
+**gamificação** — `xp` e `level` existem no banco, nunca são alterados e por isso não
+aparecem na interface. A lista completa, com o motivo de cada descarte, está em `PRD.md`,
+seção 5.
 
 ---
 

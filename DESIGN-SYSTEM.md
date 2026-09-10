@@ -28,7 +28,8 @@ marca e uma techno legível para o conteúdo:
 
 ## 3. Arquitetura do App Shell (Layout Base)
 
-O sistema utiliza um layout fixo com duas barras de navegação principais:
+O sistema utiliza um layout fixo com três barras: **SideNavBar** e **TopNavBar** no desktop,
+e a **BottomNavBar** flutuante quando a lateral fica oculta (abaixo de `lg`).
 
 ### 3.1. SideNavBar (Barra Lateral Esquerda)
 - **Largura:** `w-52` (fixa à esquerda, altura total). Ajustada ao conteúdo — `w-64` deixava espaço vazio à direita dos rótulos.
@@ -38,14 +39,23 @@ O sistema utiliza um layout fixo com duas barras de navegação principais:
 - **Abas de Navegação:**
   - Ícones do Google Material Icons / Material Symbols.
   - Estado ativo: Fundo translúcido ou borda lateral destacada com a cor primária (`#ff2d78` ou `#00ffff`).
-- **Sem rodapé.** A sidebar contém somente a navegação por área do produto. O que é do próprio usuário (perfil e sair) fica no menu do canto superior direito.
+  - Itens: *Times*, *Usuários*, *Radar*, *Sorteio* e *Brackets*. **Usuários** e **Radar** só aparecem para Admin e Gestor — o item some do menu além de a rota e a API recusarem (PRD seções 2 e 3.2.4).
+  - **Perfil não é item de navegação:** é alcançado pelo bloco do usuário no canto superior direito.
+- **Rodapé com "Sair"**, no canto inferior esquerdo, separado da navegação por área do produto. Encerrar sessão não é um destino como os outros, e o canto inferior é onde não se clica por engano ao navegar.
 
 ### 3.2. TopNavBar (Barra Superior)
-- **Altura:** `h-16` / `h-20`, sticky (`top-0 z-50`).
-- **Layout:** Flexbox com alinhamento `justify-between`, padding lateral generoso.
+- **Altura:** `h-16`, sticky (`top-0 z-50`), com fundo translúcido e `backdrop-blur`.
+- **Layout:** Flexbox, padding lateral generoso (`px-4 sm:px-8`).
 - **Elementos:**
   - **Sem links de navegação.** A navegação vive exclusivamente na SideNavBar (e na BottomNavBar no mobile, onde a lateral fica oculta) — o cabeçalho não duplica o menu.
-  - **Menu do usuário no canto superior direito:** nome, papel, nível e avatar formam um botão que abre o menu com *Meu perfil* e *Sair*. Fecha ao clicar fora ou com `Esc`.
+  - **Logotipo apenas no mobile** (`lg:hidden`): no desktop ele já está no topo da lateral.
+  - **Bloco do usuário no canto superior direito:** nome, papel e avatar formam um **link direto para o perfil** — não um menu suspenso. Com "Sair" no rodapé da lateral, sobrou um único destino, e menu de um item só é atrito.
+  - **Sem "Nível N"** ao lado do nome: não há regra que altere o nível, então o valor seria sempre 1 (PRD seção 5).
+
+### 3.3. BottomNavBar (Mobile)
+- **Formato:** barra flutuante (`fixed inset-x-4 bottom-4`), cantos `rounded-2xl`, fundo translúcido com `backdrop-blur`. Substitui a SideNavBar abaixo de `lg`.
+- **Conteúdo:** os mesmos itens da lateral, com a mesma filtragem por papel, e **"Sair" como primeiro item, à esquerda** — espelha a posição que ele ocupa no rodapé da lateral no desktop.
+- **Consequência de layout:** o `main` reserva `pb-28` no mobile para o conteúdo não ficar embaixo da barra (`lg:pb-10` quando ela não existe).
 
 ---
 
@@ -73,7 +83,16 @@ O sistema utiliza um layout fixo com duas barras de navegação principais:
 - **Ajuste à altura da janela (sem rolagem):** como a roda é quadrada, o teto de **largura** também controla a altura — `min(28rem, 100svh - 26rem)`, onde `28rem` evita o disco de tela cheia em monitor largo e a parte em `svh` desconta o que o app gasta em volta (cabeçalho, respiros do `main`, título da página, botão e área do resultado). O campo de temas tem teto equivalente. **Padrão da casa:** dar o teto em `svh` a cada cartão, em vez de altura fixa na linha do grid — altura fixa estica os cartões e cria espaço morto quando o conteúdo para de crescer. Abaixo de ~620px de altura útil a rolagem volta, por um piso de `12rem`: roda ilegível é pior que rolagem.
 - **Regra de implementação:** o vencedor é sorteado **antes** da animação e a roda gira até ele. Nunca derive o vencedor do ângulo final.
 
-### 4.4. Tabelas de Gestão (RBAC / Usuários / Teams)
+### 4.4. Tela de Login
+
+- **Cartão único** centralado (`max-w-sm`), com o logotipo na vertical e `shadow-glow-primary`.
+- **Ordem:** formulário de e-mail e senha primeiro, divisória com "ou", e então o botão do SSO. O caminho por senha vem antes por ser o que funciona em qualquer ambiente — o SSO depende de configuração.
+- **Botão "Entrar com Microsoft":** variante `ghost` (neutra), largura total, com a **marca da Microsoft em SVG inline** — os quatro quadrados nas cores oficiais (`#f25022`, `#7fba00`, `#00a4ef`, `#ffb900`).
+  > **Exceção deliberada à diretriz de ícones:** este é o único lugar que não usa Material Symbols. As diretrizes de marca da Microsoft pedem o logotipo no botão de entrada — é o que faz a pessoa reconhecer para onde vai — e não existe logotipo de marca no Material Symbols. Não troque por um ícone genérico.
+- **Erros separados:** a falha do login por senha aparece dentro do formulário; a do SSO, abaixo do botão do SSO. Cada mensagem fica junto do que falhou.
+- **O botão do SSO só existe se estiver configurado** (`VITE_MS_TENANT_ID` e `VITE_MS_CLIENT_ID`): sem isso, a tela é apenas o formulário.
+
+### 4.5. Tabelas de Gestão (RBAC / Usuários / Teams)
 - **Cabeçalho de Tabela:** Texto em maiúsculo, espaçamento organizado.
 - **Linhas:** Efeito hover sutil (`hover:bg-surface-container-high`), avatares com iniciais coloridas (ex: crachás circulares rosa/ciano), badges de status (`Active`, `Admin`, `User`) e botões de ação compactos (Visualizar, Editar, Excluir).
 

@@ -1,7 +1,9 @@
 # ✅ tasks.md — Synergy MVP
 
 > Gerado a partir de `PRD.md`, `CLAUDE.md` e `DESIGN-SYSTEM.md` (2026-09-08).
-> Escopo: RBAC + Épico 3.1 (Gestão de Times e Membros) + App Shell.
+> Escopo inicial: RBAC + Épico 3.1 (Gestão de Times e Membros) + App Shell. As fases 4.1 a
+> 4.5 foram acrescentadas depois, conforme cada demanda apareceu — Dinâmicas, Autogestão,
+> Gestão de Acessos e SSO da Microsoft. O escopo atual, consolidado, está no `README.md`.
 >
 > **Decisões confirmadas (2026-09-08):**
 > - Banco de dados = **PostgreSQL** (via `pgx`, conforme `CLAUDE.md`).

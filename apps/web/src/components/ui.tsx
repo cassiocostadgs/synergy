@@ -170,7 +170,7 @@ export function Badge({
   )
 }
 
-/** Crachá circular com as iniciais (DESIGN-SYSTEM.md seção 4.4). */
+/** Crachá circular com as iniciais (DESIGN-SYSTEM.md seção 4.5). */
 export function Avatar({ name, tone = 'primary' }: { name: string; tone?: 'primary' | 'secondary' }) {
   const initials = name
     .split(' ')
