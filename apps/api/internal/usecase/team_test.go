@@ -529,6 +529,64 @@ func TestMotivatorsOverview_ContabilizaRespostasEPendentes(t *testing.T) {
 	}
 }
 
+func TestMotivatorsOverview_MapaDeCalorTrazTodosDoTime(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	respondeu := h.newUser("Bruno", domain.RoleColaborador)
+	naoRespondeu := h.newUser("Elis", domain.RoleColaborador)
+	team := h.newTeam("Squad Neon", gestor)
+
+	for _, membro := range []domain.Actor{respondeu, naoRespondeu} {
+		_, err := h.teams.AddMember(context.Background(), gestor, team.ID, membro.UserID, domain.TeamRoleColaborador)
+		requireNoError(t, err)
+	}
+
+	_, err := h.motivators.Save(context.Background(), respondeu, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
+	requireNoError(t, err)
+
+	// Todos aparecem, inclusive quem não respondeu — a linha vazia mostra quem falta.
+	if len(visao.Membros) != 3 {
+		t.Fatalf("esperava 3 linhas no mapa de calor, obtive %d", len(visao.Membros))
+	}
+
+	porNome := map[string]MembroDoRadar{}
+	for _, linha := range visao.Membros {
+		porNome[linha.Nome] = linha
+	}
+
+	bruno := porNome["Bruno"]
+	if !bruno.Respondeu {
+		t.Error("Bruno respondeu e deveria constar como tal")
+	}
+	if len(bruno.Posicoes) != domain.TotalMotivators {
+		t.Errorf("esperava %d posições para Bruno, obtive %d", domain.TotalMotivators, len(bruno.Posicoes))
+	}
+	// Salvou na ordem canônica: o primeiro motivador está na posição 1.
+	if bruno.Posicoes[domain.MotivatorsCanonicos[0]] != 1 {
+		t.Errorf("esperava posição 1 para %s, obtive %d",
+			domain.MotivatorsCanonicos[0], bruno.Posicoes[domain.MotivatorsCanonicos[0]])
+	}
+	if bruno.Posicoes[domain.MotivatorsCanonicos[domain.TotalMotivators-1]] != domain.TotalMotivators {
+		t.Error("o último motivador da ordem deveria estar na última posição")
+	}
+
+	elis := porNome["Elis"]
+	if elis.Respondeu {
+		t.Error("Elis não respondeu")
+	}
+	if len(elis.Posicoes) != 0 {
+		t.Errorf("quem não respondeu não deve ter posições, obtive %d", len(elis.Posicoes))
+	}
+
+	carla := porNome["Carla"]
+	if carla.PapelNoTime != domain.TeamRoleGestorPrincipal {
+		t.Errorf("esperava o papel no time na linha, obtive %q", carla.PapelNoTime)
+	}
+}
+
 func TestMotivatorsOverview_RevisaoVencidaEntraComoPendente(t *testing.T) {
 	h := newHarness(t)
 	gestor := h.newUser("Carla", domain.RoleGestor)

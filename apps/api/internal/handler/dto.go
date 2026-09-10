@@ -144,12 +144,25 @@ type pendingMemberResponse struct {
 	DaysSinceAnswer int  `json:"daysSinceAnswer,omitempty"`
 }
 
+// radarMemberResponse é a linha de uma pessoa no mapa de calor individual.
+type radarMemberResponse struct {
+	UserID   string `json:"userId"`
+	Name     string `json:"name"`
+	TeamRole string `json:"teamRole"`
+	Answered bool   `json:"answered"`
+	// Positions mapeia motivador -> colocação (1 a 10). Vazio se não respondeu.
+	Positions       map[string]int `json:"positions,omitempty"`
+	DaysSinceAnswer int            `json:"daysSinceAnswer,omitempty"`
+	NeedsReview     bool           `json:"needsReview"`
+}
+
 type teamMotivatorsResponse struct {
 	Team             teamResponse             `json:"team"`
 	MembersTotal     int                      `json:"membersTotal"`
 	MembersAnswered  int                      `json:"membersAnswered"`
 	ReviewPeriodDays int                      `json:"reviewPeriodDays"`
 	Scores           []motivatorScoreResponse `json:"scores"`
+	Members          []radarMemberResponse    `json:"members"`
 	Pending          []pendingMemberResponse  `json:"pending"`
 }
 
@@ -237,12 +250,33 @@ func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsRes
 		})
 	}
 
+	membros := make([]radarMemberResponse, 0, len(visao.Membros))
+	for _, linha := range visao.Membros {
+		item := radarMemberResponse{
+			UserID:          linha.UserID.String(),
+			Name:            linha.Nome,
+			TeamRole:        string(linha.PapelNoTime),
+			Answered:        linha.Respondeu,
+			DaysSinceAnswer: linha.DiasDesdeResposta,
+			NeedsReview:     linha.PrecisaRevisar,
+		}
+		if len(linha.Posicoes) > 0 {
+			posicoes := make(map[string]int, len(linha.Posicoes))
+			for motivador, posicao := range linha.Posicoes {
+				posicoes[string(motivador)] = posicao
+			}
+			item.Positions = posicoes
+		}
+		membros = append(membros, item)
+	}
+
 	return teamMotivatorsResponse{
 		Team:             toTeamResponse(visao.Time),
 		MembersTotal:     visao.TotalMembros,
 		MembersAnswered:  visao.Responderam,
 		ReviewPeriodDays: domain.PeriodoRevisaoDias,
 		Scores:           scores,
+		Members:          membros,
 		Pending:          pendentes,
 	}
 }

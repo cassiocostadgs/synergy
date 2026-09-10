@@ -1,6 +1,6 @@
 import type { Motivator } from '@/features/motivators/motivators'
 import { apiFetch } from '@/services/httpClient'
-import type { Team } from '@/types'
+import type { Team, TeamRole } from '@/types'
 
 export interface MotivatorScore {
   motivator: Motivator
@@ -10,6 +10,18 @@ export interface MotivatorScore {
   averagePosition: number
   /** Quantas pessoas colocaram este motivador no próprio top 3. */
   topCount: number
+}
+
+/** Linha de uma pessoa no mapa de calor individual. */
+export interface RadarMember {
+  userId: string
+  name: string
+  teamRole: TeamRole
+  answered: boolean
+  /** Motivador -> colocação (1 a 10). Ausente para quem não respondeu. */
+  positions?: Partial<Record<Motivator, number>>
+  daysSinceAnswer?: number
+  needsReview: boolean
 }
 
 export interface PendingMember {
@@ -26,6 +38,8 @@ export interface TeamMotivators {
   membersAnswered: number
   reviewPeriodDays: number
   scores: MotivatorScore[]
+  /** Respostas individuais de todos do time, para o mapa de calor. */
+  members: RadarMember[]
   pending: PendingMember[]
 }
 

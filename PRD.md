@@ -93,7 +93,7 @@ persistido**.
   * **Revisão a cada 90 dias:** motivação muda com o tempo, e uma resposta antiga descreve outra pessoa. A tela mostra há quantos dias a dinâmica foi respondida e quantos faltam para a próxima revisão; ao completar **90 dias** passa a pedir que seja refeita, indicando o atraso. O corte é inclusivo: no 90º dia já vence.
   * A contagem é por períodos completos de 24h desde a resposta, não por virada de calendário. Salvar novamente zera o contador.
   * **Sem histórico:** salvar substitui a resposta anterior. O que fica registrado é apenas a data da última vez.
-* **Acesso:** cada pessoa vê e edita **apenas o próprio** ranking. O Gestor vê o resultado **agregado** do time no Radar (seção 3.2.4), nunca o ranking individual de alguém.
+* **Acesso:** cada pessoa vê e edita **apenas o próprio** ranking. O Gestor do time e o Admin veem, no Radar (seção 3.2.4), tanto o resultado agregado quanto o ranking individual de cada membro — decisão registrada naquela seção.
 * **Modelagem:** tabela normalizada (uma linha por motivador) em vez de um JSON com a lista — o banco garante que ninguém repete motivador nem posição, e agregações futuras por time saem em SQL.
 
 #### 3.2.4. Radar do Time — **entregue**
@@ -103,17 +103,19 @@ dinâmica pendente. É a demanda que estava reservada ao Dashboard (seção 5), 
 tela própria no menu ("Radar").
 
 * **Funcionalidades:**
-  * Gráfico de radar com os 10 motivadores e a força de cada um no time.
-  * Placar ordenado, com colocação média e quantas pessoas colocaram cada motivador no próprio top 3.
+  * Gráfico de radar com os 10 motivadores e a força de cada um no time, e os 3 primeiros em destaque.
+  * **Mapa de calor individual:** matriz com uma linha por pessoa do time e uma coluna por motivador, mostrando a colocação (1 a 10) que cada um deu. As células são coloridas por faixa: **alta prioridade (1–3)**, **média (4–7)** e **baixa (8–10)**.
   * Cobertura: quantas pessoas do time responderam.
   * Lista de quem **nunca respondeu** e de quem está com a **revisão de 90 dias vencida**.
   * Seletor de time, quando o usuário tem acesso a mais de um.
 * **Regras de Negócio:**
-  * **Somente agregado.** O ranking individual de cada pessoa nunca é exibido: motivação individual é dado sensível, e o valor da visão está no conjunto. A lista de pendentes traz apenas nome e situação.
   * A força de cada motivador usa **contagem de Borda**: o 1º lugar de cada pessoa vale 10 pontos e o 10º vale 1, e o resultado é a média entre quem respondeu. Somar posições diretamente inverteria o sentido (menor é melhor) e produziria um radar de cabeça para baixo.
   * Rankings incompletos são ignorados na média, para não distorcer os motivadores que contêm.
-  * Uma resposta com revisão vencida **continua contando** no placar — ela é a informação mais recente que existe — mas a pessoa aparece na lista de pendentes.
-* **Acesso:** **Admin** e **Gestor**; o Colaborador não tem acesso (item ausente do menu, rota protegida e API recusando com 403). O Gestor só vê os times em que exerce papel de gestão — a mesma regra da administração de membros (RN2).
+  * Uma resposta com revisão vencida **continua contando** no placar — ela é a informação mais recente que existe — mas a pessoa é marcada como pendente.
+  * As colunas do mapa de calor seguem a **ordem de força no time**, não a ordem canônica: assim as células de alta prioridade se agrupam à esquerda e quem discorda do time salta aos olhos.
+  * **Todos do time aparecem** no mapa, inclusive quem não respondeu — a linha fica tracejada, mostrando a lacuna sem precisar cruzar com outra lista.
+* **Acesso e privacidade:** **Admin** e **Gestor**; o Colaborador não tem acesso (item ausente do menu, rota protegida e API recusando com 403). O Gestor só vê os times em que exerce papel de gestão — a mesma regra da administração de membros (RN2).
+  > **Decisão de 2026-09-10:** a primeira versão desta tela era **somente agregada**, por serem os motivadores um dado pessoal sensível. A decisão de produto foi **expor o ranking individual** de cada membro para quem gere o time, por meio do mapa de calor. O acesso restrito a Gestor do próprio time e Admin é o que sustenta essa exposição, e o Colaborador segue sem ver o de ninguém — nem o dos colegas, nem o próprio time.
 
 #### 3.2.5. Demais práticas Management 3.0 — **não especificadas**
 

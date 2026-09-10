@@ -195,7 +195,10 @@ pessoal e é persistido** — perder ao recarregar não faria sentido num perfil
 - [x] `domain.AgregarMotivators`: contagem de Borda (1º = 10 pontos, 10º = 1), lógica pura e testável
 - [x] `repository.FindByUsers`: uma consulta só para todos os membros, em vez de uma por pessoa
 - [x] Reaproveita `requireTeamManager` do `TeamUseCase` em vez de duplicar a regra de acesso
-- [x] **Somente agregado:** o ranking individual nunca sai na resposta; pendentes trazem só nome e situação
+- [x] ~~Somente agregado~~ → **revertido em 2026-09-10 por decisão de produto:** a resposta passou a incluir o ranking individual de cada membro, para alimentar o **mapa de calor**. O controle de acesso (Admin e Gestor do próprio time) é o que sustenta a exposição
+- [x] Mapa de calor individual: matriz pessoa × motivador, células coloridas por faixa (1–3 alta, 4–7 média, 8–10 baixa), substituindo a tabela de placar
+- [x] Colunas ordenadas pela força no time, para as células de alta prioridade se agruparem à esquerda
+- [x] Todos do time aparecem, inclusive quem não respondeu (linha tracejada) e quem tem revisão vencida (ícone ao lado do nome)
 - [x] Resposta com revisão vencida continua contando no placar, mas a pessoa entra em pendentes
 - [x] Rota `/radar` e item "Radar" no menu, restritos a Admin e Gestor
 - [x] Frontend: gráfico de radar em SVG puro (sem biblioteca), placar com barras, KPIs de cobertura e lista de pendentes
@@ -207,8 +210,9 @@ Semeadas respostas aleatórias para os 4 membros do Squad Neon, com datas distri
 propósito (5, 40, 75 e 105 dias) para a tela exibir tanto "em dia" quanto revisão vencida.
 
 ### Pendências
-- [ ] **Calibrar o visual com o exemplo do usuário** — o anexo de referência não chegou em duas tentativas; a versão atual assume gráfico de radar a partir do nome da tela
-- [ ] Decidir se o Gestor pode ver o ranking individual de alguém do time (hoje, deliberadamente, não)
+- [x] ~~Decidir se o Gestor pode ver o ranking individual~~ → **decidido: pode**, via mapa de calor (PRD seção 3.2.4)
+- [x] Layout calibrado com o exemplo enviado (mapa de calor) e compactado para caber sem rolagem em 1080p
+- [x] ~~Avisar o colaborador que o gestor vê a resposta dele~~ → **decisão de 2026-09-10: não é necessário.** O acesso do gestor ao ranking individual é intencional e não requer aviso na tela do colaborador. Reabrir se a equipe de gente/RH pedir transparência explícita.
 
 ### Demais práticas Management 3.0 — fora de escopo
 - [ ] Kudo Box, Niko-Niko e Personal Map seguem sem regra de negócio, modelo de dados ou tela (PRD seção 5)

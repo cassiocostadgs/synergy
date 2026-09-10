@@ -88,41 +88,58 @@ export function KpiCard({
   hint,
   accent = 'primary',
   icon,
+  compact = false,
 }: {
   label: string
   value: string | number
   hint?: string
   accent?: 'primary' | 'secondary'
   icon?: string
+  /** Reduz padding e corpo do número, para telas que não devem rolar. */
+  compact?: boolean
 }) {
   const isPrimary = accent === 'primary'
   return (
     <Card
       className={cx(
-        'p-5 transition-shadow',
+        'transition-shadow',
+        compact ? 'p-3.5' : 'p-5',
         isPrimary ? 'hover:shadow-glow-primary' : 'hover:shadow-glow-secondary',
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[13px] font-semibold tracking-[0.18em] text-content-muted uppercase">
+        <p
+          className={cx(
+            'font-semibold tracking-[0.18em] text-content-muted uppercase',
+            compact ? 'text-[11px]' : 'text-[13px]',
+          )}
+        >
           {label}
         </p>
         {icon ? (
           <Icon
             name={icon}
-            className={cx('text-[20px]', isPrimary ? 'text-primary' : 'text-secondary')}
+            className={cx(
+              compact ? 'text-[17px]' : 'text-[20px]',
+              isPrimary ? 'text-primary' : 'text-secondary',
+            )}
           />
         ) : null}
       </div>
       <p
         className={cx(
-          'font-display mt-3 text-4xl font-bold tracking-tight',
+          'font-display font-bold tracking-tight',
+          compact ? 'mt-1.5 text-2xl' : 'mt-3 text-4xl',
           isPrimary ? 'text-primary' : 'text-secondary',
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-content-muted">{hint}</p> : null}
+      {hint ? (
+        <p className={cx('text-content-muted', compact ? 'mt-0.5 text-[11px]' : 'mt-1 text-xs')}>
+          {hint}
+        </p>
+      ) : null}
     </Card>
   )
 }

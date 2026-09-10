@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
-  Badge,
   Card,
   EmptyState,
   ErrorBanner,
@@ -13,21 +12,25 @@ import {
   cx,
 } from '@/components/ui'
 import { MOTIVATOR_INFO } from '@/features/motivators/motivators'
-import { radarApi, type TeamMotivators } from '@/features/radar/api/radarApi'
+import { radarApi, type MotivatorScore, type TeamMotivators } from '@/features/radar/api/radarApi'
 import { GraficoRadar } from '@/features/radar/ui/GraficoRadar'
+import { MapaDeCalor } from '@/features/radar/ui/MapaDeCalor'
 import { useTeams } from '@/features/teams/hooks/useTeams'
 import { useResource } from '@/hooks/useResource'
 import type { Team } from '@/types'
 
+/** Quantas posições ganham cartão de destaque ao lado do gráfico. */
+const DESTAQUES = 3
+
 /**
- * Radar: visão agregada dos Moving Motivators de um time (PRD seção 3.2.5).
+ * Radar: visão agregada dos Moving Motivators de um time (PRD seção 3.2.4).
  *
- * Mostra o placar do time, não o ranking de cada pessoa. Motivação individual é
- * dado sensível, e o valor da visão para o gestor está no conjunto — quem
- * respondeu, o que move o time e quem está com a revisão vencida.
+ * Traz o placar do time (gráfico e destaques) e o mapa de calor com o ranking
+ * individual de cada membro.
  *
- * Acesso restrito a Admin e Gestor; a API ainda exige que o Gestor seja gestor
- * daquele time específico.
+ * Motivadores são dado pessoal sensível, e é o controle de acesso que sustenta
+ * essa exposição: apenas Admin e Gestor, e a API ainda exige que o Gestor seja
+ * gestor daquele time específico. Colaborador não acessa.
  */
 export function RadarPage() {
   const { teams, loading: carregandoTimes, error: erroTimes } = useTeams()
@@ -87,13 +90,12 @@ export function RadarPage() {
 }
 
 function ConteudoDoRadar({ data }: { data: TeamMotivators }) {
-  const semRespostas = data.membersAnswered === 0
   const cobertura =
     data.membersTotal > 0 ? Math.round((data.membersAnswered / data.membersTotal) * 100) : 0
   const naoResponderam = data.pending.filter((membro) => !membro.answered)
   const revisaoVencida = data.pending.filter((membro) => membro.answered)
 
-  if (semRespostas) {
+  if (data.membersAnswered === 0) {
     return (
       <Card>
         <EmptyState
@@ -105,16 +107,20 @@ function ConteudoDoRadar({ data }: { data: TeamMotivators }) {
     )
   }
 
+  const destaques = data.scores.slice(0, DESTAQUES)
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3">
         <KpiCard
+          compact
           label="Responderam"
           value={`${data.membersAnswered}/${data.membersTotal}`}
           hint={`${cobertura}% do time`}
           icon="how_to_reg"
         />
         <KpiCard
+          compact
           label="Move mais o time"
           value={MOTIVATOR_INFO[data.scores[0].motivator].nome}
           hint={`${data.scores[0].topCount} de ${data.membersAnswered} colocaram no top 3`}
@@ -122,129 +128,119 @@ function ConteudoDoRadar({ data }: { data: TeamMotivators }) {
           icon="trending_up"
         />
         <KpiCard
+          compact
           label="Revisões vencidas"
           value={revisaoVencida.length}
-          hint={`recomendado revisar a cada ${data.reviewPeriodDays} dias`}
+          hint={`revisar a cada ${data.reviewPeriodDays} dias`}
           icon="event_repeat"
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[auto_1fr] lg:items-start">
-        <Card className="flex justify-center p-5">
-          <GraficoComLegenda data={data} />
+      {/*
+        Duas colunas de metade cada: gráfico com os destaques à esquerda, mapa
+        de calor à direita. Empilhar os dois faria a página rolar.
+      */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card className="p-4">
+          <GraficoRadar scores={data.scores} />
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {destaques.map((item, indice) => (
+              <CartaoDeDestaque
+                key={item.motivator}
+                item={item}
+                posicao={indice + 1}
+                respondentes={data.membersAnswered}
+              />
+            ))}
+          </div>
         </Card>
 
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-outline text-[13px] tracking-[0.14em] text-content-muted uppercase">
-                  <th className="px-5 py-3 font-semibold">#</th>
-                  <th className="px-5 py-3 font-semibold">Motivador</th>
-                  <th className="px-5 py-3 font-semibold">Força</th>
-                  <th className="px-5 py-3 text-right font-semibold">No top 3</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.scores.map((item, indice) => {
-                  const info = MOTIVATOR_INFO[item.motivator]
-                  const noTopo = indice < 3
-
-                  return (
-                    <tr
-                      key={item.motivator}
-                      className="border-b border-outline/60 transition-colors last:border-0 hover:bg-surface-container-high"
-                    >
-                      <td className="px-5 py-3">
-                        <span
-                          className={cx(
-                            'flex size-6 items-center justify-center rounded-full text-[12px] font-bold',
-                            noTopo
-                              ? 'bg-primary text-white shadow-glow-primary'
-                              : 'bg-surface-container-high text-content-muted',
-                          )}
-                        >
-                          {indice + 1}º
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <p className="font-semibold text-content">{info.nome}</p>
-                        <p className="text-xs text-content-muted">{info.desc}</p>
-                      </td>
-                      <td className="px-5 py-3">
-                        {/* Barra proporcional ao score, que já vem na escala 0–10. */}
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-24 overflow-hidden rounded-full bg-surface-container-high">
-                            <div
-                              className={cx(
-                                'h-full rounded-full',
-                                noTopo ? 'bg-primary' : 'bg-secondary/70',
-                              )}
-                              style={{ width: `${(item.score / 10) * 100}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-content-muted">
-                            {item.score.toFixed(1)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-right text-sm text-content-muted">
-                        {item.topCount}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <MapaDeCalor membros={data.members} scores={data.scores} />
         </Card>
       </div>
 
+      {/* Faixa fina em vez de cartão com título: economiza altura. */}
       {data.pending.length > 0 ? (
-        <Card className="p-5">
-          <h2 className="font-display mb-3 text-lg font-bold text-content">
-            Precisam de atenção
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {naoResponderam.map((membro) => (
-              <span
-                key={membro.userId}
-                className="flex items-center gap-1.5 rounded-full border border-outline bg-surface-dim px-3 py-1 text-sm text-content-muted"
-              >
-                <Icon name="pending" className="text-[16px]" />
-                {membro.name}
-                <Badge tone="neutral">nunca respondeu</Badge>
-              </span>
-            ))}
-            {revisaoVencida.map((membro) => (
-              <span
-                key={membro.userId}
-                className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-sm text-warning"
-              >
-                <Icon name="event_repeat" className="text-[16px]" />
-                {membro.name}
-                <Badge tone="warning">há {membro.daysSinceAnswer} dias</Badge>
-              </span>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-content-muted">
-            Cada pessoa responde no próprio perfil — os rankings individuais não são exibidos
-            aqui.
-          </p>
+        <Card className="flex flex-wrap items-center gap-2 p-3.5">
+          <span className="text-[11px] font-semibold tracking-[0.16em] text-content-muted uppercase">
+            Atenção
+          </span>
+          {naoResponderam.map((membro) => (
+            <span
+              key={membro.userId}
+              className="flex items-center gap-1.5 rounded-full border border-outline bg-surface-dim px-2.5 py-0.5 text-xs text-content-muted"
+            >
+              <Icon name="pending" className="text-[14px]" />
+              {membro.name} · nunca respondeu
+            </span>
+          ))}
+          {revisaoVencida.map((membro) => (
+            <span
+              key={membro.userId}
+              className="flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-0.5 text-xs text-warning"
+            >
+              <Icon name="event_repeat" className="text-[14px]" />
+              {membro.name} · há {membro.daysSinceAnswer} dias
+            </span>
+          ))}
         </Card>
       ) : null}
     </div>
   )
 }
 
-function GraficoComLegenda({ data }: { data: TeamMotivators }) {
+/**
+ * Destaque compacto de um dos três primeiros motivadores.
+ *
+ * Fica logo abaixo do gráfico, em três colunas estreitas — daí a ausência da
+ * descrição do motivador, que está na tabela ao lado.
+ */
+function CartaoDeDestaque({
+  item,
+  posicao,
+  respondentes,
+}: {
+  item: MotivatorScore
+  posicao: number
+  respondentes: number
+}) {
+  const info = MOTIVATOR_INFO[item.motivator]
+  const primeiro = posicao === 1
+
   return (
-    <div className="flex flex-col items-center gap-3">
-      <GraficoRadar scores={data.scores} />
-      <p className="max-w-[24rem] text-center text-xs text-content-muted">
-        Cada eixo é um motivador; quanto mais longe do centro, mais o time é movido por ele. A
-        escala vai de 1 a 10 e resulta da média das colocações de {data.membersAnswered}{' '}
-        {data.membersAnswered === 1 ? 'pessoa' : 'pessoas'}.
+    <div
+      className={cx(
+        'rounded-lg border px-2.5 py-2',
+        primeiro
+          ? 'border-primary/50 bg-primary-soft'
+          : 'border-outline bg-surface-dim',
+      )}
+      title={`${info.nome}: ${info.desc}`}
+    >
+      <div className="flex items-center gap-1.5">
+        <span
+          className={cx(
+            'flex size-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+            primeiro ? 'bg-primary text-white' : 'bg-surface-container-high text-content-muted',
+          )}
+        >
+          {posicao}
+        </span>
+        <p className="truncate text-xs font-semibold text-content">{info.nome}</p>
+      </div>
+
+      <p
+        className={cx(
+          'font-display mt-1 text-xl leading-none font-bold',
+          primeiro ? 'text-primary' : 'text-secondary',
+        )}
+      >
+        {item.score.toFixed(1)}
+      </p>
+      <p className="mt-0.5 text-[10px] text-content-muted">
+        {item.topCount}/{respondentes} no top 3
       </p>
     </div>
   )

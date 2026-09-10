@@ -336,31 +336,47 @@ func (uc *TeamUseCase) TransferPrincipal(ctx context.Context, actor domain.Actor
 
 // MembroPendente descreve alguém do time cuja dinâmica precisa de atenção.
 type MembroPendente struct {
-	UserID          uuid.UUID
-	Nome            string
-	Respondeu       bool
+	UserID            uuid.UUID
+	Nome              string
+	Respondeu         bool
 	DiasDesdeResposta int
 }
 
-// MotivatorsDoTime é a visão agregada dos motivadores de um time (o "Radar").
+// MembroDoRadar é a linha de uma pessoa no mapa de calor individual.
+type MembroDoRadar struct {
+	UserID      uuid.UUID
+	Nome        string
+	PapelNoTime domain.TeamRole
+	Respondeu   bool
+	// Posicoes traz a colocação (1 a 10) que a pessoa deu a cada motivador.
+	// Vazio para quem não respondeu.
+	Posicoes          map[domain.Motivator]int
+	DiasDesdeResposta int
+	PrecisaRevisar    bool
+}
+
+// MotivatorsDoTime é a visão dos motivadores de um time (o "Radar").
 type MotivatorsDoTime struct {
 	Time         *domain.Team
 	TotalMembros int
 	Responderam  int
 	Placar       []domain.MotivatorTeamScore
+	// Membros traz a resposta individual de cada pessoa do time, para o mapa de
+	// calor. Contém dado pessoal de motivação — ver a nota de acesso abaixo.
+	Membros []MembroDoRadar
 	// Pendentes reúne quem não respondeu e quem está com a revisão vencida.
-	// Traz apenas nome e situação — nunca o ranking individual de ninguém.
 	Pendentes []MembroPendente
 }
 
 // MotivatorsOverview monta o Radar do time.
 //
-// Deliberadamente **agregado**: expõe o placar do time e quem está pendente,
-// mas não o ranking individual de cada pessoa. Motivação individual é dado
-// sensível, e o valor da visão para o gestor está no conjunto.
+// Devolve o placar agregado E as respostas individuais de cada membro, que
+// alimentam o mapa de calor da tela.
 //
-// Acesso restrito aos Gestores do próprio time e ao Admin — a mesma regra que
-// governa a administração do time (RN2).
+// A exposição do individual foi uma decisão explícita de produto (PRD seção
+// 3.2.4): motivação individual é dado sensível, e por isso o acesso é restrito
+// aos Gestores do próprio time e ao Admin — a mesma regra que governa a
+// administração do time (RN2). Colaborador não acessa.
 func (uc *TeamUseCase) MotivatorsOverview(
 	ctx context.Context,
 	actor domain.Actor,
@@ -392,22 +408,42 @@ func (uc *TeamUseCase) MotivatorsOverview(
 
 	respondidos := make([]domain.MotivatorRanking, 0, len(rankings))
 	pendentes := make([]MembroPendente, 0, len(membros))
+	linhas := make([]MembroDoRadar, 0, len(membros))
 
 	for _, membro := range membros {
+		linha := MembroDoRadar{
+			UserID:      membro.UserID,
+			Nome:        membro.UserName,
+			PapelNoTime: membro.Role,
+		}
+
 		ranking, respondeu := rankings[membro.UserID]
 		if !respondeu || !ranking.Preenchido() {
 			pendentes = append(pendentes, MembroPendente{
 				UserID: membro.UserID,
 				Nome:   membro.UserName,
 			})
+			// Entra no mapa de calor mesmo sem resposta: a linha vazia mostra
+			// quem falta sem precisar cruzar com outra lista.
+			linhas = append(linhas, linha)
 			continue
 		}
 
 		respondidos = append(respondidos, *ranking)
 
-		// Respondeu, mas já passou do período de revisão.
-		if ranking.PrecisaRevisar(agora) {
-			dias, _ := ranking.DiasDesdeResposta(agora)
+		posicoes := make(map[domain.Motivator]int, len(ranking.Ordem))
+		for indice, motivador := range ranking.Ordem {
+			posicoes[motivador] = indice + 1
+		}
+		dias, _ := ranking.DiasDesdeResposta(agora)
+
+		linha.Respondeu = true
+		linha.Posicoes = posicoes
+		linha.DiasDesdeResposta = dias
+		linha.PrecisaRevisar = ranking.PrecisaRevisar(agora)
+		linhas = append(linhas, linha)
+
+		if linha.PrecisaRevisar {
 			pendentes = append(pendentes, MembroPendente{
 				UserID:            membro.UserID,
 				Nome:              membro.UserName,
@@ -422,6 +458,7 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		TotalMembros: len(membros),
 		Responderam:  len(respondidos),
 		Placar:       domain.AgregarMotivators(respondidos),
+		Membros:      linhas,
 		Pendentes:    pendentes,
 	}, nil
 }

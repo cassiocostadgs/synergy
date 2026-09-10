@@ -9,9 +9,25 @@ import type { MotivatorScore } from '@/features/radar/api/radarApi'
  * tamanhos diferentes.
  */
 
-const TAMANHO = 340
-const CENTRO = TAMANHO / 2
-const RAIO = 118
+/*
+ * Geometria do desenho.
+ *
+ * A área é mais larga que alta de propósito: os rótulos ficam fora dos eixos, e
+ * os eixos quase horizontais empurram o texto para as bordas. Com um viewBox
+ * quadrado, rótulos como "Curiosidade" saíam da área visível.
+ *   Largura mínima = 2 × (RAIO + DISTANCIA_ROTULO + largura do maior rótulo)
+ *
+ * TAMANHO_ROTULO é grande em unidades do viewBox porque texto em SVG escala com
+ * o container: como o gráfico é renderizado compacto, uma fonte "normal" aqui
+ * chegaria ilegível na tela.
+ */
+const LARGURA = 460
+const ALTURA = 300
+const CENTRO_X = LARGURA / 2
+const CENTRO_Y = ALTURA / 2
+const RAIO = 100
+const DISTANCIA_ROTULO = 20
+const TAMANHO_ROTULO = 16
 const ESCALA_MAXIMA = 10
 const ANEIS = [0.25, 0.5, 0.75, 1]
 
@@ -19,8 +35,8 @@ function ponto(indice: number, total: number, distancia: number) {
   // Começa no topo (-90°) e caminha no sentido horário.
   const angulo = ((indice / total) * 360 - 90) * (Math.PI / 180)
   return {
-    x: CENTRO + Math.cos(angulo) * distancia,
-    y: CENTRO + Math.sin(angulo) * distancia,
+    x: CENTRO_X + Math.cos(angulo) * distancia,
+    y: CENTRO_Y + Math.sin(angulo) * distancia,
   }
 }
 
@@ -35,13 +51,13 @@ export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
 
   return (
     <svg
-      viewBox={`0 0 ${TAMANHO} ${TAMANHO}`}
-      className="w-full max-w-[26rem]"
+      viewBox={`0 0 ${LARGURA} ${ALTURA}`}
+      className="w-full"
       role="img"
       aria-label="Gráfico de radar dos motivadores do time"
     >
       <defs>
-        <linearGradient id="radar-area" x1="0" y1="0" x2={TAMANHO} y2={TAMANHO}>
+        <linearGradient id="radar-area" x1="0" y1="0" x2={LARGURA} y2={ALTURA}>
           <stop offset="0%" stopColor="#ff2d78" stopOpacity="0.45" />
           <stop offset="100%" stopColor="#00fbfb" stopOpacity="0.35" />
         </linearGradient>
@@ -66,17 +82,17 @@ export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
       {/* Eixos e rótulos */}
       {scores.map((item, indice) => {
         const fim = ponto(indice, total, RAIO)
-        const rotulo = ponto(indice, total, RAIO + 26)
+        const rotulo = ponto(indice, total, RAIO + DISTANCIA_ROTULO)
         const nome = MOTIVATOR_INFO[item.motivator].nome
         // Ancora o texto conforme o lado, para não invadir o gráfico.
         const ancora =
-          rotulo.x > CENTRO + 6 ? 'start' : rotulo.x < CENTRO - 6 ? 'end' : 'middle'
+          rotulo.x > CENTRO_X + 6 ? 'start' : rotulo.x < CENTRO_X - 6 ? 'end' : 'middle'
 
         return (
           <g key={item.motivator}>
             <line
-              x1={CENTRO}
-              y1={CENTRO}
+              x1={CENTRO_X}
+              y1={CENTRO_Y}
               x2={fim.x}
               y2={fim.y}
               stroke="#24312f"
@@ -87,7 +103,7 @@ export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
               y={rotulo.y}
               textAnchor={ancora}
               dominantBaseline="middle"
-              fontSize="11"
+              fontSize={TAMANHO_ROTULO}
               fontWeight={indice < 3 ? 700 : 500}
               fill={indice < 3 ? '#ff2d78' : '#c2d5d2'}
             >
@@ -112,7 +128,7 @@ export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
           key={scores[indice].motivator}
           cx={v.x}
           cy={v.y}
-          r="3.5"
+          r="4"
           fill={indice < 3 ? '#ff2d78' : '#00fbfb'}
         />
       ))}

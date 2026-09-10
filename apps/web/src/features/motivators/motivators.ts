@@ -46,6 +46,32 @@ export const MOTIVATOR_INFO: Record<Motivator, { nome: string; desc: string }> =
 /** Quantas posições do topo recebem destaque visual. */
 export const DESTAQUE_TOPO = 3
 
+/**
+ * Abreviação de 3 letras de cada motivador, para cabeçalhos de coluna estreitos
+ * como o mapa de calor do Radar.
+ */
+export const MOTIVATOR_SIGLA: Record<Motivator, string> = {
+  CURIOSIDADE: 'CUR',
+  LIBERDADE: 'LIB',
+  PROPOSITO: 'PRO',
+  MAESTRIA: 'MAE',
+  RELACOES: 'REL',
+  HONRA: 'HON',
+  ACEITACAO: 'ACE',
+  ORDEM: 'ORD',
+  PODER: 'POD',
+  STATUS: 'STA',
+}
+
+/** Faixas de prioridade do mapa de calor, conforme a colocação (1 a 10). */
+export type FaixaDePrioridade = 'alta' | 'media' | 'baixa'
+
+export function faixaDaPosicao(posicao: number): FaixaDePrioridade {
+  if (posicao <= 3) return 'alta'
+  if (posicao <= 7) return 'media'
+  return 'baixa'
+}
+
 /** Move um item da lista para outra posição, sem alterar o array original. */
 export function mover<T>(itens: T[], de: number, para: number): T[] {
   if (de === para || de < 0 || para < 0 || de >= itens.length || para >= itens.length) {
