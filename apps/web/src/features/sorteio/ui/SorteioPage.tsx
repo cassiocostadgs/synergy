@@ -120,10 +120,26 @@ export function SorteioPage() {
         numa tela larga a roda continuava pequena ao lado de um textarea
         gigante. A roda é o que se olha; o campo se resolve em 18rem, e ganha
         um pouco mais só quando há folga (xl).
+
+        Para a tela caber sem rolagem, cada cartão tem seu teto em `svh` em vez
+        de a linha ter altura fixa: altura fixa esticaria os cartões e deixaria
+        espaço morto em monitor alto, já que a roda para de crescer em 28rem.
+        A referência dos cálculos é `13.5rem` — o que o app gasta acima e abaixo
+        desta linha (cabeçalho 4rem, respiros do main 1.5rem + 2.5rem, título da
+        página ~5rem).
       */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card className="flex flex-col items-center gap-5 p-6">
+          {/*
+            A roda é quadrada, então limitar a largura limita também a altura:
+            28rem quando há folga, `100svh - 26rem` quando a altura é o que
+            aperta (13.5rem de fora da linha + 12.5rem que o cartão gasta com
+            padding, botão e área do resultado). O piso de 12rem evita que ela
+            suma numa janela muito baixa; nesse caso a página volta a rolar, o
+            que é melhor que uma roda ilegível.
+          */}
           <Roleta
+            className="max-w-[28rem] lg:max-w-[min(28rem,max(12rem,calc(100svh_-_26rem)))]"
             temas={temasNaRoda}
             rotacao={rotacao}
             duracaoMs={duracao}
@@ -158,12 +174,17 @@ export function SorteioPage() {
             <span className="mb-1.5 block text-xs font-semibold tracking-wide text-content-muted uppercase">
               Temas — um por linha
             </span>
+            {/*
+              `rows` é o tamanho natural; o teto em `svh` só entra em janela
+              baixa, para o cartão dos temas não ser o que estoura a tela
+              (13.5rem de fora da linha + 7.5rem do resto do cartão).
+            */}
             <textarea
               value={texto}
               onChange={(event) => setTexto(event.target.value)}
               rows={12}
               spellCheck={false}
-              className="w-full resize-y rounded-lg border border-outline bg-surface-dim px-3 py-2 text-sm text-content transition-shadow focus:border-primary focus:shadow-glow-primary focus:outline-none"
+              className="w-full resize-y rounded-lg border border-outline bg-surface-dim px-3 py-2 text-sm text-content transition-shadow focus:border-primary focus:shadow-glow-primary focus:outline-none lg:max-h-[max(6rem,calc(100svh_-_21rem))]"
               placeholder={'Retrospectiva\nDébito técnico\nMetas do trimestre'}
             />
           </label>
