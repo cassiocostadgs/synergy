@@ -104,7 +104,27 @@ func (r *UserRepository) UpdateRole(ctx context.Context, userID uuid.UUID, role 
 	return nil
 }
 
-const userColumns = `id, name, email, password_hash, role::text, status::text, created_at`
+// LinkMicrosoftOID amarra o cadastro à conta do Entra ID.
+//
+// A restrição UNIQUE da coluna é o que impede dois usuários do Synergy de
+// apontarem para a mesma pessoa no Entra; translate converte a violação em
+// Conflict, para o caso de uso não ter que consultar antes de gravar.
+func (r *UserRepository) LinkMicrosoftOID(ctx context.Context, userID uuid.UUID, oid string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET microsoft_oid = $2 WHERE id = $1`,
+		userID, oid,
+	)
+	if err != nil {
+		return translate(err, "esta conta Microsoft já está vinculada a outro usuário")
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("usuário não encontrado")
+	}
+	return nil
+}
+
+const userColumns = `id, name, email, password_hash, role::text, status::text, created_at,
+	COALESCE(microsoft_oid, '')`
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return r.queryUser(ctx, `SELECT `+userColumns+` FROM users WHERE id = $1`, id)
@@ -112,6 +132,15 @@ func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Us
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	return r.queryUser(ctx, `SELECT `+userColumns+` FROM users WHERE email = $1`, email)
+}
+
+func (r *UserRepository) FindByMicrosoftOID(ctx context.Context, oid string) (*domain.User, error) {
+	// Guarda contra o oid vazio: sem ela, quem nunca entrou por SSO casaria com
+	// qualquer token cujo claim viesse em branco.
+	if oid == "" {
+		return nil, domain.NotFound("usuário não encontrado")
+	}
+	return r.queryUser(ctx, `SELECT `+userColumns+` FROM users WHERE microsoft_oid = $1`, oid)
 }
 
 func (r *UserRepository) List(ctx context.Context) ([]domain.User, error) {
@@ -154,6 +183,7 @@ func scanUser(row scanner) (*domain.User, error) {
 	)
 	if err := row.Scan(
 		&user.ID, &user.Name, &user.Email, &user.PasswordHash, &role, &status, &user.CreatedAt,
+		&user.MicrosoftOID,
 	); err != nil {
 		return nil, err
 	}

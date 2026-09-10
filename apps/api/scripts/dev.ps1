@@ -22,6 +22,12 @@ try {
     if (-not $env:API_PORT) { $env:API_PORT = '8080' }
     if (-not $env:CORS_ALLOWED_ORIGINS) { $env:CORS_ALLOWED_ORIGINS = 'http://localhost:5173' }
 
+    # SSO da Microsoft (opcional). Sem as duas, a API sobe só com login por senha
+    # e o botao nao aparece na tela de login. Defina no shell antes de rodar, ou
+    # descomente aqui com os GUIDs do app registration do Entra:
+    # $env:MS_TENANT_ID = '00000000-0000-0000-0000-000000000000'  # Directory (tenant) ID
+    # $env:MS_CLIENT_ID = '00000000-0000-0000-0000-000000000000'  # Application (client) ID
+
     $exe = Join-Path (Get-SynergyBuildDir) 'api.exe'
 
     Write-Host 'Compilando a API...' -ForegroundColor Cyan

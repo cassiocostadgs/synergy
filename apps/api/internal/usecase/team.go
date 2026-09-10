@@ -102,8 +102,8 @@ func (uc *TeamUseCase) Get(ctx context.Context, actor domain.Actor, teamID uuid.
 // MeuPapel fica vazio quando o ator não é membro — caso possível para o Admin,
 // que vê todos os times.
 type TimeComPapel struct {
-	Time      domain.Team
-	MeuPapel  domain.TeamRole
+	Time     domain.Team
+	MeuPapel domain.TeamRole
 }
 
 // List retorna todos os times para o Admin e apenas os times do próprio usuário

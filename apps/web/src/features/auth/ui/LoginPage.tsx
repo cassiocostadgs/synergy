@@ -1,9 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 
 import { Logo } from '@/components/Logo'
 import { Button, Card, ErrorBanner, Input } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import {
+  LoginMicrosoftCancelado,
+  prepararMicrosoft,
+  ssoMicrosoftHabilitado,
+} from '@/features/auth/microsoft'
 import { ApiError } from '@/services/httpClient'
 
 /**
@@ -29,13 +34,44 @@ async function ofertarSalvarSenha(email: string, senha: string): Promise<void> {
   }
 }
 
+/**
+ * Marca da Microsoft, em SVG.
+ *
+ * Vem inline porque as diretrizes de marca pedem o logotipo no botão de "Entrar
+ * com Microsoft" — é o que faz a pessoa reconhecer para onde vai — e o
+ * Material Symbols não tem logotipos de marca.
+ */
+function MarcaMicrosoft() {
+  return (
+    <svg viewBox="0 0 21 21" className="size-4 shrink-0" aria-hidden>
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  )
+}
+
 export function LoginPage() {
-  const { me, loading, login } = useAuth()
+  const { me, loading, login, loginComMicrosoft } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [lembrar, setLembrar] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Erro do SSO fica separado do erro de senha para cada mensagem aparecer
+  // junto do botão que falhou.
+  const [erroSSO, setErroSSO] = useState<string | null>(null)
+  const [entrandoComMicrosoft, setEntrandoComMicrosoft] = useState(false)
+
+  const comSSO = ssoMicrosoftHabilitado()
+
+  // Inicializa o MSAL ao montar. Se isso ficasse dentro do clique, o `await`
+  // antes de abrir a janela faria o navegador tratá-la como popup não
+  // solicitado — e bloqueá-la.
+  useEffect(() => {
+    if (comSSO) void prepararMicrosoft().catch(() => undefined)
+  }, [comSSO])
 
   if (!loading && me) {
     return <Navigate to="/times" replace />
@@ -44,6 +80,7 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setErroSSO(null)
     setSubmitting(true)
     try {
       await login(email, password, lembrar)
@@ -53,6 +90,28 @@ export function LoginPage() {
       setError(err instanceof ApiError ? err.message : 'Não foi possível entrar')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleMicrosoft() {
+    setError(null)
+    setErroSSO(null)
+    setEntrandoComMicrosoft(true)
+    try {
+      await loginComMicrosoft(lembrar)
+    } catch (err) {
+      if (err instanceof LoginMicrosoftCancelado) {
+        // Fechar a janela é desistência, não falha: nada a informar.
+        return
+      }
+      // A mensagem do erro SSO_SEM_CADASTRO já traz o e-mail usado e a
+      // instrução de procurar o administrador — vem da API de propósito, para
+      // não haver duas versões do mesmo texto.
+      setErroSSO(
+        err instanceof ApiError ? err.message : 'Não foi possível entrar com a Microsoft',
+      )
+    } finally {
+      setEntrandoComMicrosoft(false)
     }
   }
 
@@ -97,10 +156,47 @@ export function LoginPage() {
 
           {error ? <ErrorBanner message={error} /> : null}
 
-          <Button type="submit" icon="login" disabled={submitting} className="w-full">
+          <Button
+            type="submit"
+            icon="login"
+            disabled={submitting || entrandoComMicrosoft}
+            className="w-full"
+          >
             {submitting ? 'Entrando…' : 'Entrar'}
           </Button>
         </form>
+
+        {comSSO ? (
+          <div className="mt-5">
+            <div className="mb-4 flex items-center gap-3" aria-hidden>
+              <span className="h-px flex-1 bg-outline" />
+              <span className="text-xs text-content-muted">ou</span>
+              <span className="h-px flex-1 bg-outline" />
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => void handleMicrosoft()}
+              disabled={submitting || entrandoComMicrosoft}
+            >
+              <MarcaMicrosoft />
+              {entrandoComMicrosoft ? 'Aguardando a Microsoft…' : 'Entrar com Microsoft'}
+            </Button>
+
+            {erroSSO ? (
+              <div className="mt-4">
+                <ErrorBanner message={erroSSO} />
+              </div>
+            ) : null}
+
+            <p className="mt-3 text-xs text-content-muted">
+              Use a conta da empresa. O acesso precisa ter sido cadastrado aqui antes — a
+              Microsoft confirma quem você é, não libera o acesso.
+            </p>
+          </div>
+        ) : null}
 
         <p className="mt-4 text-xs text-content-muted">
           Sem a opção marcada, a sessão é encerrada ao fechar o navegador — recomendado em

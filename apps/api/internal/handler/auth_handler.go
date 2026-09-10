@@ -39,6 +39,31 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// LoginMicrosoft — POST /api/v1/auth/microsoft
+//
+// Recebe o ID token que o MSAL obteve no navegador e, se ele for válido e
+// houver cadastro correspondente, devolve a MESMA resposta do login por senha —
+// o front não precisa saber por qual porta a sessão entrou.
+func (h *AuthHandler) LoginMicrosoft(w http.ResponseWriter, r *http.Request) {
+	var req loginMicrosoftRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	out, err := h.auth.LoginWithMicrosoft(r.Context(), req.IDToken)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, loginResponse{
+		Token:     out.Token,
+		ExpiresAt: out.ExpiresAt,
+		User:      toUserResponse(out.User),
+	})
+}
+
 // Me — GET /api/v1/me (perfil próprio, com XP e nível)
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	actor, err := requireActor(r)

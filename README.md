@@ -89,7 +89,71 @@ Acesse com o usuário criado no seed (padrão: `admin@synergy.dev`).
 
 ---
 
-## 4. Deploy
+## 4. SSO da Microsoft (opcional)
+
+O login com **"Entrar com Microsoft"** (Entra ID) convive com o login por e-mail e senha.
+Sem as variáveis abaixo, o botão simplesmente não aparece e nada muda.
+
+A regra que organiza o resto: **a Microsoft diz quem a pessoa é; o Synergy diz se ela pode
+entrar**. Não há provisionamento automático — sem cadastro feito pelo Admin, o acesso é
+recusado com a orientação de procurar o administrador (PRD seção 3.4.4).
+
+### 4.1. App registration no Entra
+
+Em **entra.microsoft.com** → *Identity* → *Applications* → *App registrations* →
+**New registration** (os nomes mudam entre versões do portal):
+
+| Campo | Valor | Por quê |
+| :--- | :--- | :--- |
+| Name | `Synergy` | aparece na tela de consentimento |
+| Supported account types | **single tenant** (só este diretório) | é o que impede conta Microsoft de fora da organização |
+| Redirect URI | plataforma **Single-page application (SPA)** + `http://localhost:5173` | precisa ser SPA, não "Web": é o que habilita Authorization Code + PKCE |
+
+Depois de criar, a página *Overview* mostra os dois valores que a aplicação usa:
+**Application (client) ID** e **Directory (tenant) ID**. Em *Authentication*, acrescente a
+URL de produção como segundo redirect URI. Em *Token configuration*, vale adicionar o claim
+opcional **`email`** — sem ele o Entra pode não enviar o e-mail, e a API cai no
+`preferred_username` (que num tenant corporativo é o mesmo endereço).
+
+Não marque as caixas de *implicit grant* ("Access tokens"/"ID tokens"): são de um fluxo
+antigo e desnecessárias com plataforma SPA. O aplicativo usa apenas `openid`, `profile` e
+`email` — **não acessa o Microsoft Graph**, então não lê e-mail, arquivo ou calendário de
+ninguém.
+
+### 4.2. Configuração
+
+Os dois GUIDs **não são segredo**: o front os embute no bundle que o navegador baixa. Neste
+fluxo não existe client secret.
+
+```powershell
+# Backend (apps/api) — no shell, antes de .\scripts\dev.ps1
+$env:MS_TENANT_ID = '<Directory (tenant) ID>'
+$env:MS_CLIENT_ID = '<Application (client) ID>'
+```
+
+```bash
+# Frontend (apps/web) — em .env, com os MESMOS valores
+VITE_MS_TENANT_ID=<Directory (tenant) ID>
+VITE_MS_CLIENT_ID=<Application (client) ID>
+```
+
+Os valores precisam ser iguais nos dois lados: o token que o front obtém é emitido *para*
+aquele client ID, e a API recusa token emitido para outro aplicativo.
+
+### 4.3. Quando algo não funciona
+
+| Sintoma | Causa provável |
+| :--- | :--- |
+| A API não sobe, reclamando de `MS_TENANT_ID` | só uma das duas variáveis foi definida, ou veio o nome do domínio no lugar do Directory ID (GUID) |
+| O botão não aparece | as variáveis `VITE_*` não estavam definidas **no momento do build** (ver seção 5) |
+| "não há cadastro no Synergy para *e-mail*" | funcionou como esperado: falta o Admin cadastrar aquele e-mail |
+| "esta conta Microsoft não pertence à organização configurada" | login com conta de outro tenant (ou conta pessoal) |
+| "o login com a Microsoft não pôde ser validado" | client ID divergente entre front e API, ou app registration alterado |
+| Erro 500 no login por SSO | a API não conseguiu falar com o Entra — é falha de infraestrutura, e é 500 de propósito para não parecer credencial inválida |
+
+---
+
+## 5. Deploy
 
 ### ⚠️ O frontend exige fallback para o `index.html`
 
@@ -176,6 +240,7 @@ regra de *rewrite* (IIS).
 | `JWT_SECRET` | segredo forte e exclusivo do ambiente — trocá-lo invalida as sessões ativas |
 | `CORS_ALLOWED_ORIGINS` | só o domínio real do frontend; desnecessário se a API estiver atrás do mesmo domínio |
 | `API_PORT` | a porta que o proxy encaminha |
+| `MS_TENANT_ID` / `MS_CLIENT_ID` | opcionais e não secretas; precisam bater com as `VITE_MS_*` usadas no build do front, e o redirect URI de produção tem que estar no app registration |
 
 As migrations são aplicadas automaticamente na subida da API, então o deploy não tem
 passo manual de banco. Rode `./cmd/seed` uma única vez, para criar o Admin inicial.
@@ -218,6 +283,7 @@ handler  →  usecase  →  domain  ←  repository
 | GET | `/` | público — identifica o serviço |
 | GET | `/health` | público |
 | POST | `/api/v1/auth/login` | público |
+| POST | `/api/v1/auth/microsoft` | público — troca o ID token do Entra pela sessão do Synergy (seção 4) |
 | GET | `/api/v1/me` | autenticado |
 | PATCH | `/api/v1/me` | autenticado — edita nome e hobby próprios |
 | PATCH | `/api/v1/me/password` | autenticado — troca a própria senha (exige a atual) |

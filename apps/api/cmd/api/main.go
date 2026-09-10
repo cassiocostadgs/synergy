@@ -58,8 +58,18 @@ func run(logger *slog.Logger) error {
 	hasher := auth.NewBcryptHasher()
 	tokens := auth.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL)
 
+	// SSO da Microsoft é opcional: sem as variáveis do Entra, o validador fica
+	// nil e a API atende apenas login por senha.
+	var microsoft usecase.MicrosoftTokenValidator
+	if cfg.MicrosoftSSOHabilitado() {
+		microsoft = auth.NewMicrosoftValidator(cfg.MicrosoftTenantID, cfg.MicrosoftClientID)
+		logger.Info("SSO da Microsoft habilitado", slog.String("tenant", cfg.MicrosoftTenantID))
+	} else {
+		logger.Info("SSO da Microsoft desabilitado (MS_TENANT_ID/MS_CLIENT_ID ausentes)")
+	}
+
 	// Casos de uso
-	authUC := usecase.NewAuthUseCase(users, profiles, members, hasher, tokens)
+	authUC := usecase.NewAuthUseCase(users, profiles, members, hasher, tokens, microsoft)
 	teamUC := usecase.NewTeamUseCase(teams, members, users, motivators)
 	motivatorUC := usecase.NewMotivatorUseCase(motivators)
 

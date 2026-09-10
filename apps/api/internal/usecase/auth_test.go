@@ -563,3 +563,168 @@ func TestCreateUser_NasceComPerfilDeGamificacao(t *testing.T) {
 		t.Errorf("esperava hobby gravado, obtive %q", out.Profile.Hobby)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Login por SSO da Microsoft (PRD seção 3.4.4)
+// ---------------------------------------------------------------------------
+
+func TestLoginWithMicrosoft_UsuarioCadastradoRecebeSessao(t *testing.T) {
+	h := newHarness(t)
+	ator := h.newUser("Ana", domain.RoleGestor)
+	token := h.vincularMicrosoft("tok-ana", "oid-ana", "ana@synergy.dev")
+
+	out, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireNoError(t, err)
+
+	if out.User.ID != ator.UserID {
+		t.Errorf("esperava a sessão de Ana, obtive %s", out.User.ID)
+	}
+	if out.Token == "" {
+		t.Error("esperava um token de sessão emitido")
+	}
+}
+
+func TestLoginWithMicrosoft_PrimeiroLoginGravaOVinculo(t *testing.T) {
+	h := newHarness(t)
+	ator := h.newUser("Ana", domain.RoleGestor)
+	token := h.vincularMicrosoft("tok-ana", "oid-ana", "ana@synergy.dev")
+
+	if oid := h.store.users[ator.UserID].MicrosoftOID; oid != "" {
+		t.Fatalf("o vínculo deveria começar vazio, obtive %q", oid)
+	}
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireNoError(t, err)
+
+	if oid := h.store.users[ator.UserID].MicrosoftOID; oid != "oid-ana" {
+		t.Errorf("esperava o oid gravado no primeiro login, obtive %q", oid)
+	}
+}
+
+func TestLoginWithMicrosoft_SemCadastroTemCodigoProprio(t *testing.T) {
+	h := newHarness(t)
+	token := h.vincularMicrosoft("tok-ninguem", "oid-ninguem", "ninguem@db1.com.br")
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+
+	// Código próprio para o front instruir a procurar o administrador em vez de
+	// mostrar a mensagem genérica de acesso negado.
+	requireCode(t, err, domain.CodeSSOSemCadastro)
+	// A mensagem cita o e-mail: quem chegou aqui já provou que é dono da caixa
+	// postal, e sem o endereço não sabe o que pedir ao administrador.
+	if !strings.Contains(err.Error(), "ninguem@db1.com.br") {
+		t.Errorf("esperava o e-mail na mensagem, obtive %q", err.Error())
+	}
+}
+
+func TestLoginWithMicrosoft_EmailComOutraCaixaAltaCasa(t *testing.T) {
+	h := newHarness(t)
+	h.newUser("Ana", domain.RoleGestor)
+	// O Entra devolve o UPN com a caixa que a pessoa digitou.
+	token := h.vincularMicrosoft("tok-ana", "oid-ana", "  ANA@Synergy.DEV ")
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireNoError(t, err)
+}
+
+func TestLoginWithMicrosoft_UsuarioInativoNaoEntra(t *testing.T) {
+	h := newHarness(t)
+	ator := h.newUser("Ana", domain.RoleGestor)
+	h.store.users[ator.UserID].Status = domain.UserStatusInactive
+	token := h.vincularMicrosoft("tok-ana", "oid-ana", "ana@synergy.dev")
+
+	// O SSO não pode ser um desvio das guardas do login por senha.
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestLoginWithMicrosoft_AuditorNaoRecebeSessao(t *testing.T) {
+	h := newHarness(t)
+	h.newUser("Auditor", domain.RoleAuditor)
+	token := h.vincularMicrosoft("tok-auditor", "oid-auditor", "auditor@synergy.dev")
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestLoginWithMicrosoft_OidTemPrecedenciaSobreEmail(t *testing.T) {
+	h := newHarness(t)
+	ator := h.newUser("Ana", domain.RoleGestor)
+	h.store.users[ator.UserID].MicrosoftOID = "oid-ana"
+
+	// Cenário real: o e-mail da Ana foi renomeado no Entra depois do vínculo.
+	token := h.vincularMicrosoft("tok-ana", "oid-ana", "ana.souza@db1.com.br")
+
+	out, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireNoError(t, err)
+	if out.User.ID != ator.UserID {
+		t.Errorf("esperava a sessão de Ana pelo oid, obtive %s", out.User.ID)
+	}
+}
+
+func TestLoginWithMicrosoft_EmailReaproveitadoPorOutraContaEhRecusado(t *testing.T) {
+	h := newHarness(t)
+	ator := h.newUser("Ana", domain.RoleGestor)
+	h.store.users[ator.UserID].MicrosoftOID = "oid-ana-antiga"
+
+	// Alguém entrou no tenant e recebeu o endereço que era da Ana. Deixar
+	// passar entregaria o histórico dela para outra pessoa.
+	token := h.vincularMicrosoft("tok-nova", "oid-pessoa-nova", "ana@synergy.dev")
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestLoginWithMicrosoft_VinculoExistenteIgnoraOEmailDoToken(t *testing.T) {
+	h := newHarness(t)
+	ana := h.newUser("Ana", domain.RoleGestor)
+	h.store.users[ana.UserID].MicrosoftOID = "oid-compartilhado"
+	bruno := h.newUser("Bruno", domain.RoleColaborador)
+
+	// Token com o oid já vinculado à Ana e o e-mail do Bruno. O oid vence: quem
+	// apresenta o token É a conta do Entra vinculada, e o e-mail do token é
+	// apenas o endereço atual dela.
+	//
+	// Como consequência, a violação de UNIQUE em microsoft_oid é inalcançável
+	// por este fluxo — a restrição do banco fica como defesa em profundidade,
+	// não como regra de negócio.
+	token := h.vincularMicrosoft("tok-oid-da-ana", "oid-compartilhado", "bruno@synergy.dev")
+
+	out, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireNoError(t, err)
+
+	if out.User.ID != ana.UserID {
+		t.Errorf("esperava a sessão da conta vinculada ao oid, obtive %s", out.User.ID)
+	}
+	if out.User.ID == bruno.UserID {
+		t.Error("o e-mail do token não deveria decidir a sessão quando o oid já tem vínculo")
+	}
+}
+
+func TestLoginWithMicrosoft_TokenInvalidoNaoVazaExistenciaDeCadastro(t *testing.T) {
+	h := newHarness(t)
+	h.newUser("Ana", domain.RoleGestor)
+
+	// Nenhuma identidade registrada: o stub reage como o validador real diante
+	// de assinatura, audience ou tenant errados.
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), "tok-forjado")
+	requireCode(t, err, domain.CodeUnauthorized)
+}
+
+func TestLoginWithMicrosoft_DesabilitadoQuandoNaoConfigurado(t *testing.T) {
+	h := newHarness(t)
+	h.newUser("Ana", domain.RoleGestor)
+
+	// Ambiente sem MS_TENANT_ID/MS_CLIENT_ID: a rota existe, mas recusa.
+	_, err := h.authSemSSO().LoginWithMicrosoft(context.Background(), "tok-ana")
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestLoginWithMicrosoft_IdentidadeSemEmailEhRecusada(t *testing.T) {
+	h := newHarness(t)
+	h.newUser("Ana", domain.RoleGestor)
+	token := h.vincularMicrosoft("tok-sem-email", "oid-ana", "")
+
+	_, err := h.auth.LoginWithMicrosoft(context.Background(), token)
+	requireCode(t, err, domain.CodeUnauthorized)
+}

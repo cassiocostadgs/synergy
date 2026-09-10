@@ -66,6 +66,35 @@ func (r fakeUserRepo) FindByEmail(_ context.Context, email string) (*domain.User
 	return nil, domain.NotFound("usuário não encontrado")
 }
 
+func (r fakeUserRepo) FindByMicrosoftOID(_ context.Context, oid string) (*domain.User, error) {
+	if oid == "" {
+		return nil, domain.NotFound("usuário não encontrado")
+	}
+	for _, user := range r.store.users {
+		if user.MicrosoftOID == oid {
+			copyUser := *user
+			return &copyUser, nil
+		}
+	}
+	return nil, domain.NotFound("usuário não encontrado")
+}
+
+// LinkMicrosoftOID imita a restrição UNIQUE do banco: dois usuários do Synergy
+// não podem apontar para a mesma conta do Entra.
+func (r fakeUserRepo) LinkMicrosoftOID(_ context.Context, id uuid.UUID, oid string) error {
+	for outroID, user := range r.store.users {
+		if outroID != id && user.MicrosoftOID == oid {
+			return domain.Conflict("esta conta Microsoft já está vinculada a outro usuário")
+		}
+	}
+	user, ok := r.store.users[id]
+	if !ok {
+		return domain.NotFound("usuário não encontrado")
+	}
+	user.MicrosoftOID = oid
+	return nil
+}
+
 func (r fakeUserRepo) UpdateName(_ context.Context, id uuid.UUID, name string) error {
 	user, ok := r.store.users[id]
 	if !ok {
@@ -345,6 +374,9 @@ type harness struct {
 	auth       *AuthUseCase
 	motivators *MotivatorUseCase
 	members    fakeMemberRepo
+	// microsoft é ponteiro para os testes registrarem identidades depois de o
+	// caso de uso já estar montado.
+	microsoft *stubMicrosoft
 }
 
 func newHarness(t *testing.T) *harness {
@@ -354,15 +386,39 @@ func newHarness(t *testing.T) *harness {
 	profiles := fakeProfileRepo{store: store}
 	teams := fakeTeamRepo{store: store}
 	members := fakeMemberRepo{store: store}
+	microsoft := &stubMicrosoft{identidades: map[string]domain.MicrosoftIdentity{}}
 
 	return &harness{
 		t:          t,
 		store:      store,
 		teams:      NewTeamUseCase(teams, members, users, fakeMotivatorRepo{store: store}),
-		auth:       NewAuthUseCase(users, profiles, members, stubHasher{}, stubTokens{}),
+		auth:       NewAuthUseCase(users, profiles, members, stubHasher{}, stubTokens{}, microsoft),
 		motivators: NewMotivatorUseCase(fakeMotivatorRepo{store: store}),
 		members:    members,
+		microsoft:  microsoft,
 	}
+}
+
+// authSemSSO monta um AuthUseCase sem validador da Microsoft, reproduzindo o
+// ambiente em que as variáveis do Entra não foram configuradas.
+func (h *harness) authSemSSO() *AuthUseCase {
+	h.t.Helper()
+	return NewAuthUseCase(
+		fakeUserRepo{store: h.store},
+		fakeProfileRepo{store: h.store},
+		fakeMemberRepo{store: h.store},
+		stubHasher{},
+		stubTokens{},
+		nil,
+	)
+}
+
+// vincularMicrosoft registra a identidade que o token cru representa e devolve
+// o token, para o teste ler como uma chamada só.
+func (h *harness) vincularMicrosoft(token, oid, email string) string {
+	h.t.Helper()
+	h.microsoft.identidades[token] = domain.MicrosoftIdentity{ObjectID: oid, Email: email}
+	return token
 }
 
 // senhaPadrao é usada pelos usuários criados sem senha explícita.
@@ -449,6 +505,27 @@ type stubTokens struct{}
 
 func (stubTokens) Issue(user *domain.User) (string, time.Time, error) {
 	return "token:" + user.ID.String(), time.Now().Add(time.Hour), nil
+}
+
+// stubMicrosoft faz o papel do validador de ID token. O caso de uso é testado a
+// partir de uma identidade JÁ validada — assinatura, audience e tenant são
+// responsabilidade de internal/auth, testada lá com chave RSA de verdade.
+type stubMicrosoft struct {
+	// identidades mapeia o token cru para a identidade que ele representa.
+	identidades map[string]domain.MicrosoftIdentity
+	// erro, quando presente, é devolvido para qualquer token.
+	erro error
+}
+
+func (s stubMicrosoft) Validate(_ context.Context, idToken string) (*domain.MicrosoftIdentity, error) {
+	if s.erro != nil {
+		return nil, s.erro
+	}
+	identidade, ok := s.identidades[idToken]
+	if !ok {
+		return nil, domain.Unauthorized("o login com a Microsoft não pôde ser validado")
+	}
+	return &identidade, nil
 }
 
 // requireCode falha o teste se o erro não for um erro de domínio com o código esperado.

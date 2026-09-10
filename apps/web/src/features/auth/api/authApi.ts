@@ -17,6 +17,17 @@ export const authApi = {
       anonymous: true,
     }),
 
+  /**
+   * Troca o ID token do Entra pela sessão do Synergy. A resposta é a mesma do
+   * login por senha — quem consome não precisa saber por qual porta entrou.
+   */
+  loginWithMicrosoft: (idToken: string) =>
+    apiFetch<LoginResult>('/auth/microsoft', {
+      method: 'POST',
+      body: { idToken },
+      anonymous: true,
+    }),
+
   me: () => apiFetch<Me>('/me'),
 
   /** O usuário edita os próprios dados. E-mail e papel não são editáveis. */

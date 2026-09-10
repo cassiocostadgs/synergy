@@ -29,6 +29,13 @@ type TeamLeadershipChecker interface {
 	ManagesActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
+// MicrosoftTokenValidator valida o ID token do Entra ID e diz quem ele
+// identifica (implementado em internal/auth). O caso de uso não conhece OIDC,
+// JWKS nem assinatura: só confia no resultado desta validação.
+type MicrosoftTokenValidator interface {
+	Validate(ctx context.Context, idToken string) (*domain.MicrosoftIdentity, error)
+}
+
 // AuthUseCase cobre autenticação, autogestão e o cadastro de usuários pelo Admin.
 type AuthUseCase struct {
 	users      domain.UserRepository
@@ -36,6 +43,9 @@ type AuthUseCase struct {
 	leadership TeamLeadershipChecker
 	hasher     PasswordHasher
 	tokens     TokenIssuer
+	// microsoft é nil quando o SSO não está configurado no ambiente — o login
+	// por senha continua funcionando normalmente nesse caso.
+	microsoft MicrosoftTokenValidator
 }
 
 func NewAuthUseCase(
@@ -44,6 +54,7 @@ func NewAuthUseCase(
 	leadership TeamLeadershipChecker,
 	hasher PasswordHasher,
 	tokens TokenIssuer,
+	microsoft MicrosoftTokenValidator,
 ) *AuthUseCase {
 	return &AuthUseCase{
 		users:      users,
@@ -51,6 +62,7 @@ func NewAuthUseCase(
 		leadership: leadership,
 		hasher:     hasher,
 		tokens:     tokens,
+		microsoft:  microsoft,
 	}
 }
 
@@ -81,14 +93,8 @@ func (uc *AuthUseCase) Login(ctx context.Context, email, password string) (*Logi
 		return nil, domain.Unauthorized("credenciais inválidas")
 	}
 
-	if !user.IsActive() {
-		return nil, domain.Forbidden("este acesso foi inativado; procure um administrador")
-	}
-
-	// O papel Auditor existe no schema mas está fora do escopo do MVP (PRD seção 5):
-	// sem regras de autorização definidas, não liberamos sessão para ele.
-	if !user.Role.ImplementedInMVP() {
-		return nil, domain.Forbidden("o papel %s não está habilitado neste MVP", user.Role)
+	if err := permitirSessao(user); err != nil {
+		return nil, err
 	}
 
 	token, expiresAt, err := uc.tokens.Issue(user)
@@ -97,6 +103,107 @@ func (uc *AuthUseCase) Login(ctx context.Context, email, password string) (*Logi
 	}
 
 	return &LoginOutput{Token: token, ExpiresAt: expiresAt, User: user}, nil
+}
+
+// permitirSessao reúne as condições que valem para QUALQUER forma de login.
+//
+// Existe como função à parte porque agora há dois caminhos de autenticação
+// (senha e Microsoft): com as checagens copiadas, a primeira regra nova entraria
+// em um e não no outro, e o furo apareceria justamente no caminho menos testado.
+func permitirSessao(user *domain.User) error {
+	if !user.IsActive() {
+		return domain.Forbidden("este acesso foi inativado; procure um administrador")
+	}
+	// O papel Auditor existe no schema mas está fora do escopo do MVP (PRD seção 5):
+	// sem regras de autorização definidas, não liberamos sessão para ele.
+	if !user.Role.ImplementedInMVP() {
+		return domain.Forbidden("o papel %s não está habilitado neste MVP", user.Role)
+	}
+	return nil
+}
+
+// LoginWithMicrosoft autentica por SSO do Microsoft Entra ID.
+//
+// A Microsoft responde "quem é a pessoa"; quem responde "esta pessoa pode
+// entrar" continua sendo o Synergy. Não há provisionamento automático: sem
+// cadastro prévio feito pelo Admin, o acesso é recusado (PRD seção 3.4.4).
+func (uc *AuthUseCase) LoginWithMicrosoft(ctx context.Context, idToken string) (*LoginOutput, error) {
+	if uc.microsoft == nil {
+		return nil, domain.Forbidden("o login com a Microsoft não está habilitado neste ambiente")
+	}
+
+	identidade, err := uc.microsoft.Validate(ctx, idToken)
+	if err != nil {
+		return nil, err
+	}
+
+	email := normalizeEmail(identidade.Email)
+	user, err := uc.resolverContaMicrosoft(ctx, identidade.ObjectID, email)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := permitirSessao(user); err != nil {
+		return nil, err
+	}
+
+	token, expiresAt, err := uc.tokens.Issue(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginOutput{Token: token, ExpiresAt: expiresAt, User: user}, nil
+}
+
+// resolverContaMicrosoft encontra o cadastro do Synergy correspondente à conta
+// do Entra, gravando o vínculo no primeiro login.
+//
+// A ordem importa: o `oid` tem precedência sobre o e-mail porque é ele que não
+// muda. Quem já entrou uma vez continua entrando mesmo depois de o endereço ser
+// renomeado no Entra.
+func (uc *AuthUseCase) resolverContaMicrosoft(
+	ctx context.Context,
+	oid, email string,
+) (*domain.User, error) {
+	if oid == "" || email == "" {
+		return nil, domain.Unauthorized("o token da Microsoft não identifica o usuário")
+	}
+
+	user, err := uc.users.FindByMicrosoftOID(ctx, oid)
+	switch {
+	case err == nil:
+		return user, nil
+	case !domain.IsNotFound(err):
+		return nil, err
+	}
+
+	// Primeiro login desta conta: é aqui que o e-mail entra, uma única vez.
+	user, err = uc.users.FindByEmail(ctx, email)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return nil, domain.SSOSemCadastro(
+				"não há cadastro no Synergy para %s; procure um administrador para liberar o seu acesso",
+				email,
+			)
+		}
+		return nil, err
+	}
+
+	// O cadastro já aponta para OUTRA conta Microsoft. Significa que o endereço
+	// foi renomeado ou reaproveitado no Entra, e seguir adiante entregaria o
+	// histórico de uma pessoa para outra.
+	if user.MicrosoftOID != "" && user.MicrosoftOID != oid {
+		return nil, domain.Forbidden(
+			"o e-mail %s já está vinculado a outra conta Microsoft; procure um administrador",
+			email,
+		)
+	}
+
+	if err := uc.users.LinkMicrosoftOID(ctx, user.ID, oid); err != nil {
+		return nil, err
+	}
+	user.MicrosoftOID = oid
+	return user, nil
 }
 
 // MeOutput agrega usuário e perfil (XP/nível) para a tela de perfil.

@@ -14,6 +14,10 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type loginMicrosoftRequest struct {
+	IDToken string `json:"idToken"`
+}
+
 type updateMeRequest struct {
 	Name  string `json:"name"`
 	Hobby string `json:"hobby"`

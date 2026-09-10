@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Config concentra os parâmetros de execução da API, todos vindos de variáveis
@@ -16,16 +18,28 @@ type Config struct {
 	JWTSecret      string
 	JWTTTL         time.Duration
 	AllowedOrigins []string
+	// SSO da Microsoft (Entra ID). Ambos vazios = SSO desligado, e a API
+	// funciona só com login por senha. Não são segredo: o front os embute no
+	// bundle que o navegador baixa.
+	MicrosoftTenantID string
+	MicrosoftClientID string
+}
+
+// MicrosoftSSOHabilitado indica se o ambiente tem SSO configurado.
+func (c *Config) MicrosoftSSOHabilitado() bool {
+	return c.MicrosoftTenantID != "" && c.MicrosoftClientID != ""
 }
 
 // Load lê a configuração do ambiente e valida o que é obrigatório.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:           env("API_PORT", "8080"),
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		JWTSecret:      os.Getenv("JWT_SECRET"),
-		JWTTTL:         time.Duration(envInt("JWT_TTL_HOURS", 8)) * time.Hour,
-		AllowedOrigins: strings.Split(env("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+		Port:              env("API_PORT", "8080"),
+		DatabaseURL:       os.Getenv("DATABASE_URL"),
+		JWTSecret:         os.Getenv("JWT_SECRET"),
+		JWTTTL:            time.Duration(envInt("JWT_TTL_HOURS", 8)) * time.Hour,
+		AllowedOrigins:    strings.Split(env("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+		MicrosoftTenantID: strings.TrimSpace(os.Getenv("MS_TENANT_ID")),
+		MicrosoftClientID: strings.TrimSpace(os.Getenv("MS_CLIENT_ID")),
 	}
 
 	if cfg.DatabaseURL == "" {
@@ -34,8 +48,33 @@ func Load() (*Config, error) {
 	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET é obrigatória")
 	}
+	if err := cfg.validarSSO(); err != nil {
+		return nil, err
+	}
 
 	return cfg, nil
+}
+
+// validarSSO recusa configuração pela metade ou em formato errado.
+//
+// Falhar na subida é melhor que descobrir depois: preenchida só uma das duas
+// variáveis, o SSO ficaria silenciosamente desligado; e com o nome de domínio
+// no lugar do GUID a validação do token falharia em produção com mensagem de
+// "token inválido", que aponta para o lugar errado.
+func (c *Config) validarSSO() error {
+	if c.MicrosoftTenantID == "" && c.MicrosoftClientID == "" {
+		return nil
+	}
+	if c.MicrosoftTenantID == "" || c.MicrosoftClientID == "" {
+		return fmt.Errorf("MS_TENANT_ID e MS_CLIENT_ID devem ser definidas juntas (ou nenhuma das duas)")
+	}
+	if _, err := uuid.Parse(c.MicrosoftTenantID); err != nil {
+		return fmt.Errorf("MS_TENANT_ID deve ser o Directory (tenant) ID em formato GUID, não o nome do domínio")
+	}
+	if _, err := uuid.Parse(c.MicrosoftClientID); err != nil {
+		return fmt.Errorf("MS_CLIENT_ID deve ser o Application (client) ID em formato GUID")
+	}
+	return nil
 }
 
 func env(key, fallback string) string {

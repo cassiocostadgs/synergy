@@ -187,6 +187,29 @@ participação que um `DELETE` destruiria.
   * O vínculo com os times é preservado na inativação e volta a valer na reativação.
 * **Custo assumido:** para a inativação valer na hora, cada requisição autenticada passou a fazer uma leitura do usuário por chave primária. Antes o papel vinha apenas do JWT, sem consultar o banco.
 
+#### 3.4.4. Login com SSO da Microsoft — **entregue**
+
+Segunda porta de entrada, ao lado do login por e-mail e senha: **"Entrar com Microsoft"**
+autentica pelo Microsoft Entra ID (antigo Azure AD) da organização.
+
+A divisão de responsabilidade é a regra que organiza todo o resto: **a Microsoft responde
+"quem é esta pessoa"; o Synergy responde "esta pessoa pode entrar"**.
+
+* **Funcionalidades:**
+  * Botão na tela de login, que abre o login da Microsoft e devolve a pessoa autenticada.
+  * O "Manter sessão neste dispositivo" vale igual para os dois caminhos: a sessão criada é a mesma (o JWT do Synergy), só a forma de provar a identidade muda.
+  * Sem cadastro correspondente, a tela informa **qual e-mail foi usado** e orienta a procurar o administrador.
+* **Regras de Negócio:**
+  * **Não há provisionamento automático.** O SSO nunca cria usuário: o Admin cadastra antes (seção 3.4 e 2). Consequência aceita: todo ingresso novo depende de uma ação do Admin antes do primeiro login — o que já era verdade para entrar em um time.
+  * **O login por senha continua disponível para todos.** É a rede de segurança: se o Entra estiver indisponível ou o app registration for alterado, ninguém fica trancado fora — nem o Admin.
+  * **Somente o tenant da organização.** Contas Microsoft de fora são recusadas na validação do token. Sem isso, "ter cadastro no Synergy" seria a única barreira, e não é nela que se confia.
+  * **As guardas do login por senha valem igualmente:** usuário inativo não entra, e papel fora do escopo do MVP (`AUDITOR`) não recebe sessão. As duas checagens são a mesma função no código, para os caminhos não divergirem.
+  * **O vínculo é pelo identificador da conta no Entra (`oid`), gravado no primeiro login**, não pelo e-mail. No primeiro acesso o e-mail é o que casa a conta; dali em diante vale o `oid`, que é imutável. Isso resolve dois casos: e-mail renomeado no Entra (a pessoa continua entrando) e endereço de quem saiu reaproveitado por outra pessoa (**recusado** — seguir adiante entregaria o histórico de alguém a um terceiro).
+  * **O nome do Synergy não é sobrescrito** pelo nome vindo da Microsoft: o nome de exibição é editável pelo próprio usuário (seção 3.3), e sobrescrevê-lo a cada login desfaria essa edição sem avisar.
+  * A mensagem de "sem cadastro" **pode citar o e-mail**, diferente do login por senha, cuja mensagem é genérica de propósito. Quem chega nesse ponto já provou ser dono da caixa postal, então não há existência de e-mail a proteger — e sem o endereço a pessoa não sabe o que pedir ao administrador.
+* **Acesso e privacidade:** o aplicativo pede apenas `openid`, `profile` e `email` — não lê e-mail, arquivo, calendário nem contatos, e não acessa o Microsoft Graph.
+* **Dependência externa:** exige um **app registration** no Entra da organização (tipo SPA, single tenant), de onde saem os dois identificadores públicos que a aplicação usa. Não há client secret neste fluxo. Ver README.
+
 ---
 
 ## 4. Estrutura de Dados Preliminar
@@ -246,6 +269,10 @@ model User {
   status    UserStatus @default(ACTIVE)
   profile   Profile?
   createdAt DateTime   @default(now())
+  // Conta do Entra ID vinculada no primeiro login por SSO (seção 3.4.4). Nulo
+  // enquanto a pessoa nunca entrou pela Microsoft; único, para duas contas do
+  // Synergy não apontarem para a mesma pessoa no Entra.
+  microsoftOid String? @unique @map("microsoft_oid")
 }
 
 model Profile {
@@ -302,5 +329,6 @@ Itens abaixo foram deliberadamente descopados desta primeira entrega (decisões 
 * **Histórico do Moving Motivators — descartado por ora:** salvar substitui a resposta anterior; guarda-se apenas a data da última. Se a evolução ao longo do tempo passar a interessar (útil em retrospectiva), vira um épico próprio.
 * **Persistência do Sorteio de Temas:** a lista de temas não é salva. Ficam em aberto, caso o módulo prove aderência: temas cadastrados por time, histórico de sorteios (para não repetir tema toda semana) e restrição de quem pode sortear.
 * **Recuperação de senha pelo próprio usuário:** não há fluxo de "esqueci minha senha" por e-mail. O reset pelo Admin (seção 3.4.2) resolve o caso comum, mas se o único Admin perder a senha, ainda é preciso alterar direto no banco.
-* **Troca de e-mail:** nem o próprio usuário nem o Admin trocam e-mail pela aplicação — é a identidade de login e exigiria fluxo de confirmação.
+* **Troca de e-mail:** nem o próprio usuário nem o Admin trocam e-mail pela aplicação — é a identidade de login e exigiria fluxo de confirmação. Para quem já entrou por SSO isso é menos crítico: o vínculo passa a ser o `oid` do Entra, e um endereço renomeado lá não quebra o acesso (seção 3.4.4).
+* **SSO — o que ficou de fora:** papel e time vindos de grupos do Entra (hoje quem define os dois é o Admin, dentro do Synergy); provisionamento automático de usuários (SCIM); encerrar também a sessão da Microsoft ao sair do Synergy; e cadastro de usuário "somente SSO", sem senha — hoje todo cadastro nasce com senha, mesmo que a pessoa só use o botão da Microsoft.
 * **Revogação de sessão:** trocar a senha não invalida tokens já emitidos. Exigiria lista de bloqueio ou versionamento de credencial no JWT.

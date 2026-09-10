@@ -64,6 +64,11 @@ func statusFor(code domain.ErrorCode) int {
 		return http.StatusNotFound
 	case domain.CodeConflict:
 		return http.StatusConflict
+	case domain.CodeSSOSemCadastro:
+		// Autenticou na Microsoft, mas não tem cadastro aqui: o pedido foi
+		// entendido e recusado, então 403 — não 401, que convidaria o cliente a
+		// tentar autenticar de novo.
+		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
 	}

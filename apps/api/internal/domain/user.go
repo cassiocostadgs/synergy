@@ -61,11 +61,33 @@ type User struct {
 	Role         Role
 	Status       UserStatus
 	CreatedAt    time.Time
+	// MicrosoftOID é o identificador da conta no Entra ID (claim `oid`),
+	// gravado no primeiro login por SSO. Vazio significa "sem vínculo".
+	//
+	// Existe porque o e-mail não é uma chave estável: ele pode ser renomeado no
+	// Entra, ou o endereço de quem saiu pode ser reaproveitado por outra pessoa
+	// — que herdaria o cadastro antigo se o casamento fosse só por e-mail.
+	MicrosoftOID string
 }
 
 // IsActive indica se o usuário pode autenticar e usar o sistema.
 func (u User) IsActive() bool {
 	return u.Status == UserStatusActive
+}
+
+// MicrosoftIdentity é o que a API extrai de um ID token válido do Entra ID.
+//
+// Vive no domínio para que a camada de negócio descreva o que precisa saber de
+// um provedor externo sem depender de biblioteca de OIDC — o mesmo motivo pelo
+// qual Actor não conhece JWT.
+//
+// O nome que vem no token é ignorado de propósito: o nome de exibição do
+// Synergy é editável pelo próprio usuário (PRD seção 3.3), e sobrescrevê-lo a
+// cada login desfaria silenciosamente essa edição.
+type MicrosoftIdentity struct {
+	// ObjectID é o claim `oid`: identifica a pessoa no tenant e não muda.
+	ObjectID string
+	Email    string
 }
 
 // Profile guarda os dados de perfil e gamificação do usuário (XP e nível).

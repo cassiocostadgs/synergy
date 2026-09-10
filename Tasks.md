@@ -286,6 +286,55 @@ direto para tarefas triviais de administração.
 
 ---
 
+## Fase 4.5 — Login com SSO da Microsoft (PRD seção 3.4.4)
+
+Decisões tomadas antes de codar: **MSAL no front** (em vez de a dança do OAuth acontecer no
+backend), **login por senha mantido para todos** como rede de segurança, e **vínculo pelo
+`oid` do Entra** gravado no primeiro login.
+
+- [x] `POST /api/v1/auth/microsoft` — rota pública, recebe o ID token e devolve a **mesma**
+      resposta do login por senha
+- [x] `internal/auth/microsoft.go`: validação do ID token com JWKS do tenant — assinatura
+      (só RS256), `iss`, `aud` igual ao client ID, `tid` igual ao tenant, `exp` obrigatório
+      e folga de 1 min para desvio de relógio
+- [x] Cache de chaves públicas com recarga na rotação e **intervalo mínimo de 5 min**, para
+      token com `kid` inventado não virar enxurrada de requisições à Microsoft
+- [x] JWKS indisponível devolve **500, não 401**: "credencial inválida" quando o problema é
+      nosso manda o usuário procurar defeito no lugar errado
+- [x] `usecase.permitirSessao` compartilhada pelos dois caminhos de login (inativo e papel
+      fora do MVP) — com as checagens copiadas, a próxima regra entraria só em um deles
+- [x] Vínculo por `oid`: primeiro login casa por e-mail e grava; dali em diante o `oid` tem
+      precedência (e-mail renomeado no Entra continua entrando)
+- [x] E-mail reaproveitado por outra conta do Entra é **recusado** — passar entregaria o
+      histórico de uma pessoa a outra
+- [x] Código de erro próprio `SSO_SEM_CADASTRO` (403) com o **e-mail usado** na mensagem;
+      diferente do login por senha, aqui citar o endereço não vaza nada, porque quem chegou
+      lá já provou ser dono da caixa postal
+- [x] `microsoft_oid` (migration 0004) com `UNIQUE` — no PostgreSQL vários NULL não
+      conflitam, então não precisou de índice parcial
+- [x] Nome do Synergy **não** é sobrescrito pelo do token: o usuário edita o próprio nome
+- [x] `MS_TENANT_ID`/`MS_CLIENT_ID` validadas na subida — as duas juntas, e em GUID (nome de
+      domínio no lugar do Directory ID falharia só em produção, como "token inválido")
+- [x] Frontend: botão com a marca da Microsoft, MSAL inicializado ao montar a tela (para o
+      navegador não bloquear o popup), cache do MSAL limpo após cada tentativa, cancelamento
+      tratado como desistência e não como erro
+- [x] MSAL carregado por `import()` dinâmico: bundle principal segue em ~308 kB e os ~284 kB
+      da biblioteca só baixam na tela de login
+- [x] **28 testes unitários** novos (16 do validador, com chave RSA real e JWKS local; 12 do
+      caso de uso) — total do backend: **132**
+- [x] Tokens recusados nos testes: assinado com outra chave, algoritmo trocado para HMAC,
+      audience de outro app, emissor de outro tenant, `tid` divergente, expirado, sem `exp`,
+      sem `oid` e sem e-mail utilizável
+
+### Pendências
+
+- [ ] **Teste ponta a ponta com a Microsoft** — depende do app registration no Entra da DB1.
+      Até lá, o SSO fica desligado por ausência das variáveis e a tela de login não muda
+- [ ] Cadastro "somente SSO" (usuário sem senha utilizável), se o SSO virar o caminho padrão
+- [ ] Papel e time a partir de grupos do Entra — hoje quem define é o Admin, dentro do Synergy
+
+---
+
 ## Fase 5 — QA e Fechamento do MVP
 
 - [x] Verificação de ponta a ponta da API contra PostgreSQL real (login, RBAC, CRUD de time,

@@ -11,6 +11,8 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User, profile *Profile) error
 	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	// FindByMicrosoftOID busca pelo vínculo com a conta do Entra ID.
+	FindByMicrosoftOID(ctx context.Context, oid string) (*User, error)
 	List(ctx context.Context) ([]User, error)
 	// UpdateName altera o nome de exibição do usuário.
 	UpdateName(ctx context.Context, userID uuid.UUID, name string) error
@@ -21,6 +23,11 @@ type UserRepository interface {
 	UpdateStatus(ctx context.Context, userID uuid.UUID, status UserStatus) error
 	// UpdateRole altera o papel global do usuário.
 	UpdateRole(ctx context.Context, userID uuid.UUID, role Role) error
+	// LinkMicrosoftOID grava o vínculo com a conta do Entra ID no primeiro
+	// login por SSO. Deve falhar com Conflict se o mesmo oid já pertencer a
+	// outro usuário — o banco é a última linha de defesa contra duas contas do
+	// Synergy apontando para a mesma pessoa no Entra.
+	LinkMicrosoftOID(ctx context.Context, userID uuid.UUID, oid string) error
 }
 
 // ProfileRepository abstrai a persistência do perfil/gamificação.

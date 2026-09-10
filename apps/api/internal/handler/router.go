@@ -66,6 +66,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	router.Route("/api/v1", func(api chi.Router) {
 		// Rotas públicas
 		api.Post("/auth/login", authHandler.Login)
+		// SSO da Microsoft. Pública como o login por senha: é ela que cria a
+		// sessão. Responde 403 quando o SSO não está configurado no ambiente.
+		api.Post("/auth/microsoft", authHandler.LoginMicrosoft)
 
 		// Rotas autenticadas
 		api.Group(func(protected chi.Router) {
