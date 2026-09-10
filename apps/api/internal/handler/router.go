@@ -14,6 +14,7 @@ import (
 type RouterConfig struct {
 	Auth           *usecase.AuthUseCase
 	Teams          *usecase.TeamUseCase
+	Motivators     *usecase.MotivatorUseCase
 	TokenParser    TokenParser
 	Sessions       SessionValidator
 	Logger         *slog.Logger
@@ -24,6 +25,7 @@ type RouterConfig struct {
 func NewRouter(cfg RouterConfig) http.Handler {
 	authHandler := NewAuthHandler(cfg.Auth)
 	teamHandler := NewTeamHandler(cfg.Teams)
+	motivatorHandler := NewMotivatorHandler(cfg.Motivators)
 
 	router := chi.NewRouter()
 	router.Use(Recoverer(cfg.Logger))
@@ -74,14 +76,23 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			protected.Patch("/me", authHandler.UpdateMe)
 			protected.Patch("/me/password", authHandler.ChangePassword)
 
+			// Moving Motivators do próprio usuário (PRD seção 3.2.3).
+			protected.Get("/me/motivators", motivatorHandler.Get)
+			protected.Put("/me/motivators", motivatorHandler.Save)
+
 			// Cadastro de usuários é exclusivo do Admin (PRD seção 2);
 			// a listagem também atende o Gestor, que precisa montar seu time.
 			protected.With(RequireRole(domain.RoleAdmin)).
 				Post("/users", authHandler.CreateUser)
 			protected.With(RequireRole(domain.RoleAdmin, domain.RoleGestor)).
 				Get("/users", authHandler.ListUsers)
+			// Gestão de acessos: exclusiva do Admin (PRD seção 3.4).
 			protected.With(RequireRole(domain.RoleAdmin)).
 				Patch("/users/{userId}/status", authHandler.SetUserStatus)
+			protected.With(RequireRole(domain.RoleAdmin)).
+				Patch("/users/{userId}/role", authHandler.SetUserRole)
+			protected.With(RequireRole(domain.RoleAdmin)).
+				Post("/users/{userId}/reset-password", authHandler.ResetUserPassword)
 
 			protected.Route("/teams", func(teams chi.Router) {
 				teams.Get("/", teamHandler.List)
@@ -99,6 +110,12 @@ func NewRouter(cfg RouterConfig) http.Handler {
 					// A Regra de Negócio 2 (só Gestores do próprio time) é
 					// aplicada no caso de uso, que conhece o vínculo do ator
 					// com este time específico.
+					// Radar do time: só Gestores do próprio time e Admin. A
+					// checagem de vínculo fica no caso de uso, que conhece o
+					// papel do ator neste time específico.
+					team.With(RequireRole(domain.RoleAdmin, domain.RoleGestor)).
+						Get("/motivators", teamHandler.Motivators)
+
 					team.Get("/members", teamHandler.ListMembers)
 					team.Post("/members", teamHandler.AddMember)
 					team.Patch("/members/{userId}", teamHandler.ChangeMemberRole)

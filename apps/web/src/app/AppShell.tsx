@@ -18,6 +18,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/times', label: 'Times', icon: 'groups' },
   { to: '/usuarios', label: 'Usuários', icon: 'badge', roles: ['ADMIN', 'GESTOR'] },
+  // Radar expõe dado agregado de motivação do time: Colaborador não acessa.
+  { to: '/radar', label: 'Radar', icon: 'radar', roles: ['ADMIN', 'GESTOR'] },
   { to: '/sorteio', label: 'Sorteio', icon: 'casino' },
   { to: '/brackets', label: 'Brackets', icon: 'emoji_events' },
 ]

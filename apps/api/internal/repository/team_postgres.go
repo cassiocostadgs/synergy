@@ -293,6 +293,24 @@ func (r *TeamMemberRepository) LeadsActiveTeam(ctx context.Context, userID uuid.
 	return lidera, nil
 }
 
+func (r *TeamMemberRepository) ManagesActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error) {
+	var gere bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM team_members tm
+			JOIN teams t ON t.id = tm.team_id
+			WHERE tm.user_id = $1
+			  AND tm.role IN ('GESTOR_PRINCIPAL'::team_role, 'GESTOR_APOIO'::team_role)
+			  AND t.status = 'ACTIVE'::team_status
+		)`, userID,
+	).Scan(&gere)
+	if err != nil {
+		return false, err
+	}
+	return gere, nil
+}
+
 func scanMember(row scanner) (*domain.TeamMember, error) {
 	var (
 		member domain.TeamMember

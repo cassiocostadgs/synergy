@@ -22,9 +22,11 @@ type TokenIssuer interface {
 }
 
 // TeamLeadershipChecker é a fatia de TeamMemberRepository de que a gestão de
-// usuários precisa: saber se alguém lidera um time ativo antes de inativá-lo.
+// usuários precisa: saber que vínculos de gestão alguém tem em times ativos
+// antes de inativá-lo ou rebaixá-lo.
 type TeamLeadershipChecker interface {
 	LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
+	ManagesActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 // AuthUseCase cobre autenticação, autogestão e o cadastro de usuários pelo Admin.
@@ -327,6 +329,96 @@ func (uc *AuthUseCase) SetUserStatus(
 	}
 	user.Status = status
 	return user, nil
+}
+
+// SetUserRole altera o papel global de um usuário. Restrito ao Admin.
+func (uc *AuthUseCase) SetUserRole(
+	ctx context.Context,
+	actor domain.Actor,
+	userID uuid.UUID,
+	novoPapel domain.Role,
+) (*domain.User, error) {
+	if !actor.IsAdmin() {
+		return nil, domain.Forbidden("apenas o Admin pode alterar papéis")
+	}
+	if !novoPapel.ImplementedInMVP() {
+		return nil, domain.Validation("papel inválido para este MVP: %q", novoPapel)
+	}
+	// Rebaixar a si mesmo tiraria o próprio acesso à gestão, possivelmente
+	// deixando o sistema sem nenhum Admin.
+	if actor.UserID == userID {
+		return nil, domain.Conflict("você não pode alterar o seu próprio papel")
+	}
+
+	user, err := uc.users.FindByID(ctx, userID)
+	if err != nil {
+		if domain.IsNotFound(err) {
+			return nil, domain.NotFound("usuário não encontrado")
+		}
+		return nil, err
+	}
+	if user.Role == novoPapel {
+		return user, nil
+	}
+
+	// Papéis de gestão em time exigem Gestor ou Admin global. Rebaixar alguém
+	// que gere um time ativo quebraria essa invariante.
+	if novoPapel == domain.RoleColaborador {
+		gere, err := uc.leadership.ManagesActiveTeam(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if gere {
+			return nil, domain.Conflict(
+				"%s exerce papel de gestão em um time ativo; ajuste o time antes de rebaixá-lo",
+				user.Name,
+			)
+		}
+	}
+
+	if err := uc.users.UpdateRole(ctx, userID, novoPapel); err != nil {
+		return nil, err
+	}
+	user.Role = novoPapel
+	return user, nil
+}
+
+// ResetUserPassword define uma nova senha para outro usuário. Restrito ao Admin.
+//
+// Existe porque não há recuperação de senha por e-mail: sem isso, quem perde a
+// senha só volta com alteração direta no banco.
+//
+// O Admin não redefine a própria senha por aqui — para isso existe
+// ChangePassword, que exige a senha atual. Assim uma sessão de Admin roubada
+// não consegue trocar a senha do dono e trancá-lo fora.
+func (uc *AuthUseCase) ResetUserPassword(
+	ctx context.Context,
+	actor domain.Actor,
+	userID uuid.UUID,
+	novaSenha string,
+) error {
+	if !actor.IsAdmin() {
+		return domain.Forbidden("apenas o Admin pode redefinir a senha de outro usuário")
+	}
+	if actor.UserID == userID {
+		return domain.Conflict("para trocar a sua própria senha, use a opção do seu perfil")
+	}
+	if len(novaSenha) < minSenha {
+		return domain.Validation("a nova senha deve ter ao menos %d caracteres", minSenha)
+	}
+
+	if _, err := uc.users.FindByID(ctx, userID); err != nil {
+		if domain.IsNotFound(err) {
+			return domain.NotFound("usuário não encontrado")
+		}
+		return err
+	}
+
+	hash, err := uc.hasher.Hash(novaSenha)
+	if err != nil {
+		return err
+	}
+	return uc.users.UpdatePassword(ctx, userID, hash)
 }
 
 // EnsureActive valida que a sessão ainda pertence a um usuário ativo.

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -16,17 +17,19 @@ import (
 // Regra de Negócio 2: o acesso de novos colaboradores ao time é controlado
 // exclusivamente pelos Gestores do próprio time (Admin global também pode agir).
 type TeamUseCase struct {
-	teams   domain.TeamRepository
-	members domain.TeamMemberRepository
-	users   domain.UserRepository
+	teams      domain.TeamRepository
+	members    domain.TeamMemberRepository
+	users      domain.UserRepository
+	motivators domain.MotivatorRepository
 }
 
 func NewTeamUseCase(
 	teams domain.TeamRepository,
 	members domain.TeamMemberRepository,
 	users domain.UserRepository,
+	motivators domain.MotivatorRepository,
 ) *TeamUseCase {
-	return &TeamUseCase{teams: teams, members: members, users: users}
+	return &TeamUseCase{teams: teams, members: members, users: users, motivators: motivators}
 }
 
 // CreateTeamInput descreve a criação de um time. PrincipalUserID é opcional para
@@ -329,6 +332,98 @@ func (uc *TeamUseCase) TransferPrincipal(ctx context.Context, actor domain.Actor
 	}
 
 	return uc.members.TransferPrincipal(ctx, team.ID, current.UserID, newPrincipalUserID)
+}
+
+// MembroPendente descreve alguém do time cuja dinâmica precisa de atenção.
+type MembroPendente struct {
+	UserID          uuid.UUID
+	Nome            string
+	Respondeu       bool
+	DiasDesdeResposta int
+}
+
+// MotivatorsDoTime é a visão agregada dos motivadores de um time (o "Radar").
+type MotivatorsDoTime struct {
+	Time         *domain.Team
+	TotalMembros int
+	Responderam  int
+	Placar       []domain.MotivatorTeamScore
+	// Pendentes reúne quem não respondeu e quem está com a revisão vencida.
+	// Traz apenas nome e situação — nunca o ranking individual de ninguém.
+	Pendentes []MembroPendente
+}
+
+// MotivatorsOverview monta o Radar do time.
+//
+// Deliberadamente **agregado**: expõe o placar do time e quem está pendente,
+// mas não o ranking individual de cada pessoa. Motivação individual é dado
+// sensível, e o valor da visão para o gestor está no conjunto.
+//
+// Acesso restrito aos Gestores do próprio time e ao Admin — a mesma regra que
+// governa a administração do time (RN2).
+func (uc *TeamUseCase) MotivatorsOverview(
+	ctx context.Context,
+	actor domain.Actor,
+	teamID uuid.UUID,
+	agora time.Time,
+) (*MotivatorsDoTime, error) {
+	team, err := uc.loadTeam(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.requireTeamManager(ctx, actor, team.ID); err != nil {
+		return nil, err
+	}
+
+	membros, err := uc.members.ListByTeam(ctx, team.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]uuid.UUID, 0, len(membros))
+	for _, membro := range membros {
+		ids = append(ids, membro.UserID)
+	}
+
+	rankings, err := uc.motivators.FindByUsers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	respondidos := make([]domain.MotivatorRanking, 0, len(rankings))
+	pendentes := make([]MembroPendente, 0, len(membros))
+
+	for _, membro := range membros {
+		ranking, respondeu := rankings[membro.UserID]
+		if !respondeu || !ranking.Preenchido() {
+			pendentes = append(pendentes, MembroPendente{
+				UserID: membro.UserID,
+				Nome:   membro.UserName,
+			})
+			continue
+		}
+
+		respondidos = append(respondidos, *ranking)
+
+		// Respondeu, mas já passou do período de revisão.
+		if ranking.PrecisaRevisar(agora) {
+			dias, _ := ranking.DiasDesdeResposta(agora)
+			pendentes = append(pendentes, MembroPendente{
+				UserID:            membro.UserID,
+				Nome:              membro.UserName,
+				Respondeu:         true,
+				DiasDesdeResposta: dias,
+			})
+		}
+	}
+
+	return &MotivatorsDoTime{
+		Time:         team,
+		TotalMembros: len(membros),
+		Responderam:  len(respondidos),
+		Placar:       domain.AgregarMotivators(respondidos),
+		Pendentes:    pendentes,
+	}, nil
 }
 
 // --- helpers ---

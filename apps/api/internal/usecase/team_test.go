@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -452,6 +453,111 @@ func TestGet_UnknownTeamIsNotFound(t *testing.T) {
 
 	_, err := h.teams.Get(context.Background(), gestor, uuid.New())
 	requireCode(t, err, domain.CodeNotFound)
+}
+
+// ---------------------------------------------------------------------------
+// Radar do time (motivadores agregados)
+// ---------------------------------------------------------------------------
+
+func TestMotivatorsOverview_ColaboradorNaoTemAcesso(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	membro := h.newUser("Bruno", domain.RoleColaborador)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.teams.AddMember(context.Background(), gestor, team.ID, membro.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	_, err = h.teams.MotivatorsOverview(context.Background(), membro, team.ID, time.Now())
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestMotivatorsOverview_GestorDeOutroTimeNaoTemAcesso(t *testing.T) {
+	h := newHarness(t)
+	gestorA := h.newUser("Carla", domain.RoleGestor)
+	gestorB := h.newUser("Diego", domain.RoleGestor)
+	teamA := h.newTeam("Squad A", gestorA)
+	h.newTeam("Squad B", gestorB)
+
+	_, err := h.teams.MotivatorsOverview(context.Background(), gestorB, teamA.ID, time.Now())
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestMotivatorsOverview_GestorDoTimeEAdminTemAcesso(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
+	requireNoError(t, err)
+
+	_, err = h.teams.MotivatorsOverview(context.Background(), admin, team.ID, time.Now())
+	requireNoError(t, err)
+}
+
+func TestMotivatorsOverview_ContabilizaRespostasEPendentes(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	respondeu := h.newUser("Bruno", domain.RoleColaborador)
+	naoRespondeu := h.newUser("Elis", domain.RoleColaborador)
+	team := h.newTeam("Squad Neon", gestor)
+
+	for _, membro := range []domain.Actor{respondeu, naoRespondeu} {
+		_, err := h.teams.AddMember(context.Background(), gestor, team.ID, membro.UserID, domain.TeamRoleColaborador)
+		requireNoError(t, err)
+	}
+
+	_, err := h.motivators.Save(context.Background(), respondeu, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
+	requireNoError(t, err)
+
+	if visao.TotalMembros != 3 {
+		t.Errorf("esperava 3 membros, obtive %d", visao.TotalMembros)
+	}
+	if visao.Responderam != 1 {
+		t.Errorf("esperava 1 resposta, obtive %d", visao.Responderam)
+	}
+	// Carla e Elis não responderam.
+	if len(visao.Pendentes) != 2 {
+		t.Errorf("esperava 2 pendentes, obtive %d: %+v", len(visao.Pendentes), visao.Pendentes)
+	}
+	if len(visao.Placar) != domain.TotalMotivators {
+		t.Errorf("o placar deve trazer os %d motivadores, obtive %d", domain.TotalMotivators, len(visao.Placar))
+	}
+}
+
+func TestMotivatorsOverview_RevisaoVencidaEntraComoPendente(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.motivators.Save(context.Background(), gestor, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	// Agora está em dia...
+	visao, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
+	requireNoError(t, err)
+	if len(visao.Pendentes) != 0 {
+		t.Errorf("recém-respondido não deveria estar pendente, obtive %+v", visao.Pendentes)
+	}
+
+	// ...mas passado o período de revisão, aparece como pendente sem deixar de
+	// contar no placar.
+	futuro := time.Now().AddDate(0, 0, domain.PeriodoRevisaoDias+5)
+	visao, err = h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, futuro)
+	requireNoError(t, err)
+	if len(visao.Pendentes) != 1 {
+		t.Fatalf("esperava 1 pendente por revisão vencida, obtive %d", len(visao.Pendentes))
+	}
+	if !visao.Pendentes[0].Respondeu {
+		t.Error("quem venceu a revisão deve constar como já tendo respondido")
+	}
+	if visao.Responderam != 1 {
+		t.Errorf("a resposta vencida ainda conta no placar, esperava 1, obtive %d", visao.Responderam)
+	}
 }
 
 func TestListMembers_ReturnsUserData(t *testing.T) {

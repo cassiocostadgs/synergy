@@ -60,6 +60,19 @@ type setUserStatusRequest struct {
 	Status string `json:"status"`
 }
 
+type setUserRoleRequest struct {
+	Role string `json:"role"`
+}
+
+type resetPasswordRequest struct {
+	NewPassword string `json:"newPassword"`
+}
+
+type saveMotivatorsRequest struct {
+	// Order traz os dez motivadores, da maior para a menor prioridade.
+	Order []string `json:"order"`
+}
+
 type userResponse struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -100,6 +113,46 @@ type memberResponse struct {
 	Role   string `json:"role"`
 }
 
+type motivatorRankingResponse struct {
+	Order []string `json:"order"`
+	// Answered é false para quem nunca respondeu — nesse caso a ordem devolvida
+	// é a canônica, apenas como ponto de partida para a tela.
+	Answered  bool       `json:"answered"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	// Contadores da regra de revisão. Calculados aqui, e não no frontend, para
+	// que o período de 90 dias tenha uma única fonte da verdade.
+	DaysSinceAnswer  *int `json:"daysSinceAnswer,omitempty"`
+	DaysUntilReview  *int `json:"daysUntilReview,omitempty"`
+	ReviewPeriodDays int  `json:"reviewPeriodDays"`
+	NeedsReview      bool `json:"needsReview"`
+}
+
+type motivatorScoreResponse struct {
+	Motivator string  `json:"motivator"`
+	Score     float64 `json:"score"`
+	// AveragePosition é a colocação média (1 = topo).
+	AveragePosition float64 `json:"averagePosition"`
+	// TopCount é quantas pessoas do time colocaram no próprio top 3.
+	TopCount int `json:"topCount"`
+}
+
+type pendingMemberResponse struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	// Answered false = nunca respondeu; true = respondeu mas venceu a revisão.
+	Answered        bool `json:"answered"`
+	DaysSinceAnswer int  `json:"daysSinceAnswer,omitempty"`
+}
+
+type teamMotivatorsResponse struct {
+	Team             teamResponse             `json:"team"`
+	MembersTotal     int                      `json:"membersTotal"`
+	MembersAnswered  int                      `json:"membersAnswered"`
+	ReviewPeriodDays int                      `json:"reviewPeriodDays"`
+	Scores           []motivatorScoreResponse `json:"scores"`
+	Pending          []pendingMemberResponse  `json:"pending"`
+}
+
 // --- Mappers ---
 
 func toUserResponse(user *domain.User) userResponse {
@@ -129,6 +182,68 @@ func toMeResponse(out *usecase.MeOutput) meResponse {
 			XP:    out.Profile.XP,
 			Level: out.Profile.Level,
 		},
+	}
+}
+
+func toMotivatorRankingResponse(
+	ranking *domain.MotivatorRanking,
+	agora time.Time,
+) motivatorRankingResponse {
+	ordem := make([]string, 0, len(ranking.Ordem))
+	for _, motivador := range ranking.Ordem {
+		ordem = append(ordem, string(motivador))
+	}
+
+	resposta := motivatorRankingResponse{
+		Order:            ordem,
+		Answered:         ranking.Preenchido(),
+		ReviewPeriodDays: domain.PeriodoRevisaoDias,
+		NeedsReview:      ranking.PrecisaRevisar(agora),
+	}
+
+	if resposta.Answered {
+		atualizado := ranking.UpdatedAt
+		resposta.UpdatedAt = &atualizado
+
+		if dias, ok := ranking.DiasDesdeResposta(agora); ok {
+			resposta.DaysSinceAnswer = &dias
+		}
+		if restantes, ok := ranking.DiasParaRevisar(agora); ok {
+			resposta.DaysUntilReview = &restantes
+		}
+	}
+
+	return resposta
+}
+
+func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsResponse {
+	scores := make([]motivatorScoreResponse, 0, len(visao.Placar))
+	for _, item := range visao.Placar {
+		scores = append(scores, motivatorScoreResponse{
+			Motivator:       string(item.Motivator),
+			Score:           item.Score,
+			AveragePosition: item.AveragePosition,
+			TopCount:        item.TopCount,
+		})
+	}
+
+	pendentes := make([]pendingMemberResponse, 0, len(visao.Pendentes))
+	for _, membro := range visao.Pendentes {
+		pendentes = append(pendentes, pendingMemberResponse{
+			UserID:          membro.UserID.String(),
+			Name:            membro.Nome,
+			Answered:        membro.Respondeu,
+			DaysSinceAnswer: membro.DiasDesdeResposta,
+		})
+	}
+
+	return teamMotivatorsResponse{
+		Team:             toTeamResponse(visao.Time),
+		MembersTotal:     visao.TotalMembros,
+		MembersAnswered:  visao.Responderam,
+		ReviewPeriodDays: domain.PeriodoRevisaoDias,
+		Scores:           scores,
+		Pending:          pendentes,
 	}
 }
 

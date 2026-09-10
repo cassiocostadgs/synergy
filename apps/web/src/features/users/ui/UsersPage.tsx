@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 
 import {
   Avatar,
@@ -7,6 +7,7 @@ import {
   Card,
   Dialog,
   ErrorBanner,
+  Icon,
   Input,
   PageHeader,
   Select,
@@ -40,6 +41,8 @@ export function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [erroAcao, setErroAcao] = useState<string | null>(null)
   const [emAndamento, setEmAndamento] = useState<string | null>(null)
+  const [papelDe, setPapelDe] = useState<User | null>(null)
+  const [senhaDe, setSenhaDe] = useState<User | null>(null)
 
   const users = data ?? []
   const inativos = users.filter((user) => user.status === 'INACTIVE').length
@@ -140,23 +143,45 @@ export function UsersPage() {
                     </td>
                     {isAdmin ? (
                       <td className="px-5 py-3">
-                        <div className="flex justify-end">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {ehVoceMesmo ? (
+                            // O próprio Admin não altera papel, senha nem status
+                            // por aqui — as guardas estão na API e a UI reflete.
                             <span className="text-xs text-content-muted">Você</span>
                           ) : (
-                            <Button
-                              variant={inativo ? 'secondary' : 'danger'}
-                              icon={inativo ? 'person_check' : 'person_off'}
-                              disabled={emAndamento === user.id}
-                              className="px-2.5 py-1 text-xs"
-                              onClick={() => void alternarStatus(user)}
-                            >
-                              {emAndamento === user.id
-                                ? 'Aguarde…'
-                                : inativo
-                                  ? 'Reativar'
-                                  : 'Inativar'}
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                icon="badge"
+                                disabled={emAndamento === user.id}
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setPapelDe(user)}
+                              >
+                                Papel
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                icon="key"
+                                disabled={emAndamento === user.id}
+                                className="px-2 py-1 text-xs"
+                                onClick={() => setSenhaDe(user)}
+                              >
+                                Senha
+                              </Button>
+                              <Button
+                                variant={inativo ? 'secondary' : 'danger'}
+                                icon={inativo ? 'person_check' : 'person_off'}
+                                disabled={emAndamento === user.id}
+                                className="px-2 py-1 text-xs"
+                                onClick={() => void alternarStatus(user)}
+                              >
+                                {emAndamento === user.id
+                                  ? 'Aguarde…'
+                                  : inativo
+                                    ? 'Reativar'
+                                    : 'Inativar'}
+                              </Button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -178,7 +203,196 @@ export function UsersPage() {
         }}
         onReload={() => void reload()}
       />
+
+      <AlterarPapelDialog
+        user={papelDe}
+        onClose={() => setPapelDe(null)}
+        onSaved={() => {
+          setPapelDe(null)
+          void reload()
+        }}
+      />
+
+      <RedefinirSenhaDialog user={senhaDe} onClose={() => setSenhaDe(null)} />
     </>
+  )
+}
+
+/** Altera o papel global de outro usuário. */
+function AlterarPapelDialog({
+  user,
+  onClose,
+  onSaved,
+}: {
+  user: User | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [role, setRole] = useState<Role>('COLABORADOR')
+  const [erro, setErro] = useState<string | null>(null)
+  const [salvando, setSalvando] = useState(false)
+
+  // Reabre já refletindo o papel atual de quem foi escolhido.
+  useEffect(() => {
+    if (user) {
+      setRole(user.role)
+      setErro(null)
+    }
+  }, [user])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!user) return
+
+    setErro(null)
+    setSalvando(true)
+    try {
+      await authApi.setUserRole(user.id, role)
+      onSaved()
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : 'Não foi possível alterar o papel')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Dialog open={user !== null} title="Alterar papel global" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-sm text-content-muted">
+          Papel de <strong className="text-content">{user?.name}</strong>.
+        </p>
+
+        <Select
+          label="Papel global"
+          value={role}
+          onChange={(event) => setRole(event.target.value as Role)}
+        >
+          <option value="COLABORADOR">Colaborador</option>
+          <option value="GESTOR">Gestor</option>
+          <option value="ADMIN">Admin</option>
+        </Select>
+
+        <p className="rounded-lg border border-outline bg-surface-dim px-3 py-2 text-xs text-content-muted">
+          Quem exerce papel de gestão em um time ativo não pode ser rebaixado a Colaborador —
+          ajuste o time antes.
+        </p>
+
+        {erro ? <ErrorBanner message={erro} /> : null}
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" icon="check" disabled={salvando || role === user?.role}>
+            {salvando ? 'Salvando…' : 'Alterar papel'}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
+/** Redefine a senha de outro usuário, sem exigir a antiga. */
+function RedefinirSenhaDialog({
+  user,
+  onClose,
+}: {
+  user: User | null
+  onClose: () => void
+}) {
+  const [senha, setSenha] = useState('')
+  const [confirmacao, setConfirmacao] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [pronto, setPronto] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setSenha('')
+      setConfirmacao('')
+      setErro(null)
+      setPronto(false)
+    }
+  }, [user])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!user) return
+
+    if (senha !== confirmacao) {
+      setErro('A confirmação não confere com a nova senha.')
+      return
+    }
+
+    setErro(null)
+    setEnviando(true)
+    try {
+      await authApi.resetUserPassword(user.id, senha)
+      setPronto(true)
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : 'Não foi possível redefinir a senha')
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <Dialog open={user !== null} title="Redefinir senha" onClose={onClose}>
+      {pronto ? (
+        <div className="space-y-4">
+          <p className="flex items-start gap-2 text-sm text-success">
+            <Icon name="check_circle" className="text-[18px]" />
+            Senha de {user?.name} redefinida. Combine com a pessoa que ela troque por uma própria
+            no perfil.
+          </p>
+          <p className="text-xs text-content-muted">
+            As sessões já abertas dessa pessoa seguem válidas até expirar.
+          </p>
+          <div className="flex justify-end">
+            <Button onClick={onClose}>Fechar</Button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm text-content-muted">
+            Nova senha para <strong className="text-content">{user?.name}</strong>. A senha atual
+            não é necessária.
+          </p>
+
+          <Input
+            label="Nova senha"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            hint="Mínimo de 8 caracteres"
+            value={senha}
+            onChange={(event) => setSenha(event.target.value)}
+          />
+          <Input
+            label="Confirmar nova senha"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={confirmacao}
+            onChange={(event) => setConfirmacao(event.target.value)}
+          />
+
+          {erro ? <ErrorBanner message={erro} /> : null}
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" icon="key" disabled={enviando}>
+              {enviando ? 'Redefinindo…' : 'Redefinir senha'}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
   )
 }
 

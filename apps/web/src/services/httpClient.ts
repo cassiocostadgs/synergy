@@ -66,7 +66,7 @@ export function setToken(token: string | null, lembrar = true): void {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown
   /** Rotas públicas (login) não enviam o Authorization. */
   anonymous?: boolean

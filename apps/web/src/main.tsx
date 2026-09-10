@@ -8,6 +8,7 @@ import { AuthProvider } from '@/features/auth/hooks/useAuth'
 import { BracketsPage } from '@/features/brackets/ui/BracketsPage'
 import { LoginPage } from '@/features/auth/ui/LoginPage'
 import { ProfilePage } from '@/features/profile/ui/ProfilePage'
+import { RadarPage } from '@/features/radar/ui/RadarPage'
 import { SorteioPage } from '@/features/sorteio/ui/SorteioPage'
 import { TeamMembersPage } from '@/features/teams/ui/TeamMembersPage'
 import { TeamsPage } from '@/features/teams/ui/TeamsPage'
@@ -37,6 +38,15 @@ createRoot(document.getElementById('root')!).render(
               element={
                 <RequireRole roles={['ADMIN', 'GESTOR']}>
                   <UsersPage />
+                </RequireRole>
+              }
+            />
+            {/* Radar: Colaborador não tem acesso (PRD seção 3.2.5). */}
+            <Route
+              path="/radar"
+              element={
+                <RequireRole roles={['ADMIN', 'GESTOR']}>
+                  <RadarPage />
                 </RequireRole>
               }
             />

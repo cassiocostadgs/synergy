@@ -74,10 +74,51 @@ sucessiva (ex: *melhor filme de todos os tempos*).
   * **Trocar um vencedor invalida o que dependia dele:** ao voltar e mudar a decisão de um confronto anterior, as escolhas seguintes que envolviam o participante removido deixam de valer automaticamente. A chave é derivada das escolhas, não mutada.
 * **Acesso:** qualquer usuário autenticado, como o Sorteio de Temas.
 
-#### 3.2.3. Práticas Management 3.0 — **não especificadas**
+#### 3.2.3. Moving Motivators — **entregue**
 
-Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo
-de dados ou tela. Ver seção 5.
+Primeira das práticas nomeadas do Management 3.0. Vive **dentro do perfil** de cada pessoa:
+não é ferramenta de facilitação efêmera como as duas anteriores, e sim **dado pessoal
+persistido**.
+
+* **Funcionalidades:**
+  * Cada usuário ordena os **10 motivadores** conforme as próprias prioridades: Curiosidade, Liberdade, Propósito, Maestria, Relações, Honra, Aceitação, Ordem, Poder e Status.
+  * Reordenação por **arraste** ou pelas **setas** de cada item.
+  * As 3 primeiras posições recebem destaque visual.
+  * A resposta é **salva** e exibe a data do último preenchimento.
+* **Regras de Negócio:**
+  * A resposta exige a **permutação completa dos 10** — não existe ordenação parcial. Aceitar lista incompleta produziria perfis incomparáveis entre pessoas.
+  * Motivador repetido ou desconhecido é recusado.
+  * Salvar **substitui** a resposta anterior por completo; não há histórico de versões.
+  * Quem nunca respondeu recebe a ordem canônica como ponto de partida, marcada como não respondida.
+  * **Revisão a cada 90 dias:** motivação muda com o tempo, e uma resposta antiga descreve outra pessoa. A tela mostra há quantos dias a dinâmica foi respondida e quantos faltam para a próxima revisão; ao completar **90 dias** passa a pedir que seja refeita, indicando o atraso. O corte é inclusivo: no 90º dia já vence.
+  * A contagem é por períodos completos de 24h desde a resposta, não por virada de calendário. Salvar novamente zera o contador.
+  * **Sem histórico:** salvar substitui a resposta anterior. O que fica registrado é apenas a data da última vez.
+* **Acesso:** cada pessoa vê e edita **apenas o próprio** ranking. O Gestor vê o resultado **agregado** do time no Radar (seção 3.2.4), nunca o ranking individual de alguém.
+* **Modelagem:** tabela normalizada (uma linha por motivador) em vez de um JSON com a lista — o banco garante que ninguém repete motivador nem posição, e agregações futuras por time saem em SQL.
+
+#### 3.2.4. Radar do Time — **entregue**
+
+Visão agregada dos Moving Motivators de um time: o que move o grupo e quem está com a
+dinâmica pendente. É a demanda que estava reservada ao Dashboard (seção 5), entregue como
+tela própria no menu ("Radar").
+
+* **Funcionalidades:**
+  * Gráfico de radar com os 10 motivadores e a força de cada um no time.
+  * Placar ordenado, com colocação média e quantas pessoas colocaram cada motivador no próprio top 3.
+  * Cobertura: quantas pessoas do time responderam.
+  * Lista de quem **nunca respondeu** e de quem está com a **revisão de 90 dias vencida**.
+  * Seletor de time, quando o usuário tem acesso a mais de um.
+* **Regras de Negócio:**
+  * **Somente agregado.** O ranking individual de cada pessoa nunca é exibido: motivação individual é dado sensível, e o valor da visão está no conjunto. A lista de pendentes traz apenas nome e situação.
+  * A força de cada motivador usa **contagem de Borda**: o 1º lugar de cada pessoa vale 10 pontos e o 10º vale 1, e o resultado é a média entre quem respondeu. Somar posições diretamente inverteria o sentido (menor é melhor) e produziria um radar de cabeça para baixo.
+  * Rankings incompletos são ignorados na média, para não distorcer os motivadores que contêm.
+  * Uma resposta com revisão vencida **continua contando** no placar — ela é a informação mais recente que existe — mas a pessoa aparece na lista de pendentes.
+* **Acesso:** **Admin** e **Gestor**; o Colaborador não tem acesso (item ausente do menu, rota protegida e API recusando com 403). O Gestor só vê os times em que exerce papel de gestão — a mesma regra da administração de membros (RN2).
+
+#### 3.2.5. Demais práticas Management 3.0 — **não especificadas**
+
+Kudo Box, Niko-Niko e Personal Map seguem sem regra de negócio, modelo de dados ou tela.
+Ver seção 5.
 
 ### 3.3. Autogestão de Conta
 
@@ -98,12 +139,36 @@ do próprio cadastro sem depender do Admin.
   * **Papel global** — seria escalada de privilégio.
   * **XP e nível** — seria burla da gamificação.
 * **Limitação conhecida:** trocar a senha **não invalida os tokens já emitidos**; eles seguem válidos até expirar. Revogar sessões exigiria lista de bloqueio ou versionamento de credencial.
-* **Fora de escopo:** recuperação de senha por e-mail ("esqueci minha senha") e reset de senha de terceiros pelo Admin. Sem isso, um usuário que perca a senha depende de intervenção direta no banco.
+* **Fora de escopo:** recuperação de senha por e-mail ("esqueci minha senha"). O reset pelo Admin existe (seção 3.4.2) e cobre o caso de quem perde a senha, mas depende de haver um Admin disponível.
 
-### 3.4. Inativação de Acessos
+### 3.4. Gestão de Acessos pelo Admin
 
-Exclusivo do **Admin**, na tela de Usuários. Inativar **não exclui**: o vínculo com os
-times permanece, preservando o histórico de participação que um `DELETE` destruiria.
+Exclusivo do **Admin**, na tela de Usuários: inativar/reativar acessos, alterar papel global
+e redefinir a senha de outra pessoa.
+
+#### 3.4.1. Alteração de papel global
+
+* **Funcionalidade:** o Admin altera o papel de qualquer usuário entre Colaborador, Gestor e Admin.
+* **Regras de Negócio:**
+  * O Admin **não altera o próprio papel** — rebaixar-se poderia deixar o sistema sem nenhum Admin.
+  * Não é possível rebaixar a Colaborador quem **exerce papel de gestão (Principal ou Apoio) em um time ativo**: papéis de gestão exigem Gestor ou Admin global, e o rebaixamento quebraria essa invariante. O time precisa ser ajustado antes. Quem gere apenas time **arquivado** pode ser rebaixado.
+  * Promover quem gere time é sempre permitido (Admin também pode gerir time).
+  * `AUDITOR` é recusado, por estar fora do escopo do MVP (seção 2).
+
+#### 3.4.2. Redefinição de senha de terceiros
+
+* **Funcionalidade:** o Admin define uma nova senha para outro usuário, **sem informar a antiga**.
+* **Motivação:** não há recuperação de senha por e-mail. Sem este recurso, quem perde a senha só volta com alteração direta no banco.
+* **Regras de Negócio:**
+  * Mínimo de 8 caracteres, como no cadastro.
+  * O Admin **não redefine a própria senha por aqui** — para isso existe a troca no perfil, que exige a senha atual. Assim uma sessão de Admin roubada não consegue trocar a senha do dono e trancá-lo fora.
+  * A senha nunca é devolvida na resposta (204 sem corpo).
+  * As sessões já abertas do usuário seguem válidas até expirar (mesma limitação de JWT descrita na seção 3.3).
+
+#### 3.4.3. Inativação de acessos
+
+Inativar **não exclui**: o vínculo com os times permanece, preservando o histórico de
+participação que um `DELETE` destruiria.
 
 * **Funcionalidades:**
   * Inativar e reativar o acesso de qualquer usuário.
@@ -123,7 +188,8 @@ times permanece, preservando o histórico de participação que um `DELETE` dest
 > **Banco de dados:** PostgreSQL (acessado via GORM/pgx no backend, conforme `CLAUDE.md`).
 >
 > O Sorteio de Temas (3.2.1) e o Brackets (3.2.2) **não possuem modelo de dados**: as listas
-> vivem no navegador durante a sessão e nada é gravado.
+> vivem no navegador durante a sessão e nada é gravado. O Moving Motivators (3.2.3), ao
+> contrário, é dado pessoal e é persistido.
 
 
 enum Role {
@@ -136,6 +202,34 @@ enum Role {
 enum UserStatus {
   ACTIVE
   INACTIVE
+}
+
+enum Motivator {
+  CURIOSIDADE
+  LIBERDADE
+  PROPOSITO
+  MAESTRIA
+  RELACOES
+  HONRA
+  ACEITACAO
+  ORDEM
+  PODER
+  STATUS
+}
+
+// Moving Motivators (seção 3.2.3): uma linha por motivador, com a posição
+// escolhida. O par (userId, motivator) e o par (userId, rankPosition) são
+// únicos, então o banco impede motivador repetido e duas prioridades na mesma
+// posição.
+model UserMotivator {
+  userId       String    @map("user_id")
+  motivator    Motivator
+  rankPosition Int       @map("rank_position") // 1 a 10
+  updatedAt    DateTime  @default(now()) @map("updated_at")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, motivator])
+  @@unique([userId, rankPosition])
 }
 
 model User {
@@ -194,10 +288,13 @@ model TeamMember {
 Itens abaixo foram deliberadamente descopados desta primeira entrega (decisões de 2026-09-08). Ficam registrados aqui para não serem confundidos com lacunas do PRD:
 
 * **Papel Auditor:** reservado no enum `Role`, sem regras de permissão implementadas no MVP.
-* **Dashboard / Behavioral Insights:** o `DESIGN-SYSTEM.md` já especifica os componentes visuais (KPI Cards, grade de insights comportamentais), mas nenhuma regra de negócio, fonte de dado ou tela real entra neste MVP — apenas o componente de KPI Card genérico é construído, sem dado de produto por trás.
+* **Dashboard / Behavioral Insights:** o `DESIGN-SYSTEM.md` já especifica os componentes visuais (KPI Cards, grade de insights comportamentais), mas nenhuma regra de negócio, fonte de dado ou tela real entra neste MVP — apenas o componente de KPI Card genérico é construído, sem dado de produto por trás. **Já há uma demanda esperando por ele:** a visão do Gestor sobre os Moving Motivators do time, incluindo quem está com a revisão de 90 dias vencida.
 * **Módulo de Metas (Goal):** avaliação e acompanhamento de metas citados na visão geral e na matriz de RBAC, mas sem modelo de dados nem épico detalhado nesta versão.
 * **Gamificação (regras de XP e nível):** os campos `xp` e `level` existem no `Profile` desde a primeira versão, mas **nunca são alterados** — não há regra que defina o que gera XP, quanto vale cada evento, nem a curva de nível. Por isso não são exibidos na interface (seção 3.3). Especificar isso depende de Metas e Dinâmicas, já que os candidatos naturais a gerar XP (meta concluída, participação em dinâmica, kudo recebido) vivem nesses épicos.
-* **Práticas Management 3.0 nomeadas:** Moving Motivators, Kudo Box, Niko-Niko e Personal Map continuam sem especificação. O módulo de Dinâmicas (seção 3.2) deixou de estar integralmente fora de escopo — o Sorteio de Temas foi entregue —, mas estas quatro práticas seguem pendentes.
+* **Práticas Management 3.0 restantes:** Kudo Box, Niko-Niko e Personal Map continuam sem especificação. O Moving Motivators (seção 3.2.3) foi entregue.
+* ~~Visibilidade do Moving Motivators pelo Gestor~~ → **entregue** como Radar do Time (seção 3.2.4), em tela própria em vez de esperar o Dashboard.
+* **Histórico do Moving Motivators — descartado por ora:** salvar substitui a resposta anterior; guarda-se apenas a data da última. Se a evolução ao longo do tempo passar a interessar (útil em retrospectiva), vira um épico próprio.
 * **Persistência do Sorteio de Temas:** a lista de temas não é salva. Ficam em aberto, caso o módulo prove aderência: temas cadastrados por time, histórico de sorteios (para não repetir tema toda semana) e restrição de quem pode sortear.
-* **Recuperação de senha:** não há fluxo de "esqueci minha senha" nem reset pelo Admin (ver seção 3.3). É bloqueador para produção — hoje quem perde a senha depende de alteração direta no banco.
+* **Recuperação de senha pelo próprio usuário:** não há fluxo de "esqueci minha senha" por e-mail. O reset pelo Admin (seção 3.4.2) resolve o caso comum, mas se o único Admin perder a senha, ainda é preciso alterar direto no banco.
+* **Troca de e-mail:** nem o próprio usuário nem o Admin trocam e-mail pela aplicação — é a identidade de login e exigiria fluxo de confirmação.
 * **Revogação de sessão:** trocar a senha não invalida tokens já emitidos. Exigiria lista de bloqueio ou versionamento de credencial no JWT.

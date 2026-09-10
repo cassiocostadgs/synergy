@@ -162,6 +162,66 @@ func (h *AuthHandler) SetUserStatus(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, toUserResponse(user))
 }
 
+// SetUserRole — PATCH /api/v1/users/{userId}/role (restrito ao Admin)
+func (h *AuthHandler) SetUserRole(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	userID, err := parseUUID(chi.URLParam(r, "userId"), "userId")
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	var req setUserRoleRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	user, err := h.auth.SetUserRole(r.Context(), actor, userID, domain.Role(req.Role))
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, toUserResponse(user))
+}
+
+// ResetUserPassword — POST /api/v1/users/{userId}/reset-password (Admin)
+//
+// Responde 204 sem corpo: não há nada de útil a devolver, e a senha nunca é
+// ecoada de volta.
+func (h *AuthHandler) ResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	userID, err := parseUUID(chi.URLParam(r, "userId"), "userId")
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	var req resetPasswordRequest
+	if err := decode(r, &req); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	if err := h.auth.ResetUserPassword(r.Context(), actor, userID, req.NewPassword); err != nil {
+		respondError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ListUsers — GET /api/v1/users (Admin e Gestor, para montar o time)
 func (h *AuthHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	actor, err := requireActor(r)

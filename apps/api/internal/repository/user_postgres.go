@@ -90,6 +90,20 @@ func (r *UserRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, sta
 	return nil
 }
 
+func (r *UserRepository) UpdateRole(ctx context.Context, userID uuid.UUID, role domain.Role) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE users SET role = $2::user_role WHERE id = $1`,
+		userID, string(role),
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.NotFound("usuário não encontrado")
+	}
+	return nil
+}
+
 const userColumns = `id, name, email, password_hash, role::text, status::text, created_at`
 
 func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {

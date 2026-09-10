@@ -17,17 +17,19 @@ import (
 // Os getters devolvem cópias, para que os casos de uso só consigam persistir
 // alterações chamando explicitamente Update/Add/Remove.
 type fakeStore struct {
-	users    map[uuid.UUID]*domain.User
-	profiles map[uuid.UUID]*domain.Profile
-	teams    map[uuid.UUID]*domain.Team
-	members  []*domain.TeamMember
+	users      map[uuid.UUID]*domain.User
+	profiles   map[uuid.UUID]*domain.Profile
+	teams      map[uuid.UUID]*domain.Team
+	members    []*domain.TeamMember
+	motivators map[uuid.UUID]*domain.MotivatorRanking
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		users:    map[uuid.UUID]*domain.User{},
-		profiles: map[uuid.UUID]*domain.Profile{},
-		teams:    map[uuid.UUID]*domain.Team{},
+		users:      map[uuid.UUID]*domain.User{},
+		profiles:   map[uuid.UUID]*domain.Profile{},
+		teams:      map[uuid.UUID]*domain.Team{},
+		motivators: map[uuid.UUID]*domain.MotivatorRanking{},
 	}
 }
 
@@ -91,6 +93,15 @@ func (r fakeUserRepo) UpdateStatus(_ context.Context, id uuid.UUID, status domai
 	return nil
 }
 
+func (r fakeUserRepo) UpdateRole(_ context.Context, id uuid.UUID, role domain.Role) error {
+	user, ok := r.store.users[id]
+	if !ok {
+		return domain.NotFound("usuário não encontrado")
+	}
+	user.Role = role
+	return nil
+}
+
 func (r fakeUserRepo) List(_ context.Context) ([]domain.User, error) {
 	out := make([]domain.User, 0, len(r.store.users))
 	for _, user := range r.store.users {
@@ -119,6 +130,44 @@ func (r fakeProfileRepo) UpdateHobby(_ context.Context, userID uuid.UUID, hobby 
 		return domain.NotFound("perfil não encontrado")
 	}
 	profile.Hobby = hobby
+	return nil
+}
+
+// --- MotivatorRepository ---
+
+type fakeMotivatorRepo struct{ store *fakeStore }
+
+func (r fakeMotivatorRepo) FindByUserID(_ context.Context, userID uuid.UUID) (*domain.MotivatorRanking, error) {
+	ranking, ok := r.store.motivators[userID]
+	if !ok {
+		// Quem nunca preencheu recebe ranking vazio, não erro.
+		return &domain.MotivatorRanking{Ordem: []domain.Motivator{}}, nil
+	}
+	copia := *ranking
+	copia.Ordem = append([]domain.Motivator{}, ranking.Ordem...)
+	return &copia, nil
+}
+
+func (r fakeMotivatorRepo) FindByUsers(
+	_ context.Context,
+	userIDs []uuid.UUID,
+) (map[uuid.UUID]*domain.MotivatorRanking, error) {
+	resultado := map[uuid.UUID]*domain.MotivatorRanking{}
+	for _, id := range userIDs {
+		if ranking, ok := r.store.motivators[id]; ok {
+			copia := *ranking
+			copia.Ordem = append([]domain.Motivator{}, ranking.Ordem...)
+			resultado[id] = &copia
+		}
+	}
+	return resultado, nil
+}
+
+func (r fakeMotivatorRepo) Replace(_ context.Context, userID uuid.UUID, ordem []domain.Motivator) error {
+	r.store.motivators[userID] = &domain.MotivatorRanking{
+		Ordem:     append([]domain.Motivator{}, ordem...),
+		UpdatedAt: time.Now().UTC(),
+	}
 	return nil
 }
 
@@ -255,6 +304,18 @@ func (r fakeMemberRepo) LeadsActiveTeam(_ context.Context, userID uuid.UUID) (bo
 	return false, nil
 }
 
+func (r fakeMemberRepo) ManagesActiveTeam(_ context.Context, userID uuid.UUID) (bool, error) {
+	for _, member := range r.store.members {
+		if member.UserID != userID || !member.Role.IsManager() {
+			continue
+		}
+		if team, ok := r.store.teams[member.TeamID]; ok && !team.IsArchived() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r fakeMemberRepo) TransferPrincipal(ctx context.Context, teamID, fromUserID, toUserID uuid.UUID) error {
 	if err := r.UpdateRole(ctx, teamID, fromUserID, domain.TeamRoleColaborador); err != nil {
 		return err
@@ -265,11 +326,12 @@ func (r fakeMemberRepo) TransferPrincipal(ctx context.Context, teamID, fromUserI
 // --- harness de teste ---
 
 type harness struct {
-	t       *testing.T
-	store   *fakeStore
-	teams   *TeamUseCase
-	auth    *AuthUseCase
-	members fakeMemberRepo
+	t          *testing.T
+	store      *fakeStore
+	teams      *TeamUseCase
+	auth       *AuthUseCase
+	motivators *MotivatorUseCase
+	members    fakeMemberRepo
 }
 
 func newHarness(t *testing.T) *harness {
@@ -281,11 +343,12 @@ func newHarness(t *testing.T) *harness {
 	members := fakeMemberRepo{store: store}
 
 	return &harness{
-		t:       t,
-		store:   store,
-		teams:   NewTeamUseCase(teams, members, users),
-		auth:    NewAuthUseCase(users, profiles, members, stubHasher{}, stubTokens{}),
-		members: members,
+		t:          t,
+		store:      store,
+		teams:      NewTeamUseCase(teams, members, users, fakeMotivatorRepo{store: store}),
+		auth:       NewAuthUseCase(users, profiles, members, stubHasher{}, stubTokens{}),
+		motivators: NewMotivatorUseCase(fakeMotivatorRepo{store: store}),
+		members:    members,
 	}
 }
 

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api/authApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { MovingMotivatorsCard } from '@/features/motivators/ui/MovingMotivatorsCard'
 import { ApiError } from '@/services/httpClient'
 import { ROLE_LABEL } from '@/types'
 
@@ -34,15 +35,22 @@ export function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Meu perfil" subtitle="Seus dados cadastrais e sua senha" />
+      <PageHeader
+        title="Meu perfil"
+        subtitle="Seus dados cadastrais, sua senha e seus motivadores"
+      />
 
-      <Card className="max-w-2xl p-6 sm:p-8">
-        <Identificacao />
-        <hr className="my-7 border-outline" />
-        <FormDados />
-        <hr className="my-7 border-outline" />
-        <FormSenha />
-      </Card>
+      <div className="space-y-4">
+        <Card className="max-w-2xl p-6 sm:p-8">
+          <Identificacao />
+          <hr className="my-7 border-outline" />
+          <FormDados />
+          <hr className="my-7 border-outline" />
+          <FormSenha />
+        </Card>
+
+        <MovingMotivatorsCard />
+      </div>
     </>
   )
 }

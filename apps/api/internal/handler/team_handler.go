@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -127,6 +128,26 @@ func (h *TeamHandler) Archive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, http.StatusOK, toTeamResponse(team))
+}
+
+// Motivators — GET /api/v1/teams/{teamId}/motivators
+//
+// O "Radar" do time: placar agregado dos Moving Motivators. Restrito aos
+// Gestores do próprio time e ao Admin; Colaborador não tem acesso.
+func (h *TeamHandler) Motivators(w http.ResponseWriter, r *http.Request) {
+	actor, teamID, err := h.actorAndTeam(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	visao, err := h.teams.MotivatorsOverview(r.Context(), actor, teamID, time.Now().UTC())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, toTeamMotivatorsResponse(visao))
 }
 
 // ListMembers — GET /api/v1/teams/{teamId}/members

@@ -40,4 +40,19 @@ export const authApi = {
   /** Ativa ou inativa um acesso. Exclusivo do Admin (PRD seção 3.4). */
   setUserStatus: (userId: string, status: UserStatus) =>
     apiFetch<User>(`/users/${userId}/status`, { method: 'PATCH', body: { status } }),
+
+  /** Altera o papel global de outro usuário. Exclusivo do Admin. */
+  setUserRole: (userId: string, role: Role) =>
+    apiFetch<User>(`/users/${userId}/role`, { method: 'PATCH', body: { role } }),
+
+  /**
+   * Redefine a senha de outro usuário, sem exigir a antiga. Exclusivo do Admin
+   * e a única saída para quem perdeu a senha, já que não há recuperação por
+   * e-mail. O Admin não redefine a própria por aqui.
+   */
+  resetUserPassword: (userId: string, newPassword: string) =>
+    apiFetch<void>(`/users/${userId}/reset-password`, {
+      method: 'POST',
+      body: { newPassword },
+    }),
 }

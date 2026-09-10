@@ -158,8 +158,60 @@ aderência, é removida. Por isso nasceu sem persistência — a remoção não 
 - [ ] Persistência da chave (hoje recarregar a página perde o progresso — pior que no Sorteio, porque o Brackets leva mais tempo para concluir)
 - [ ] Testes automatizados da lógica de chaveamento (hoje verificados por script pontual, fora de suíte)
 
-### Práticas Management 3.0 — fora de escopo
-- [ ] Kudo Box, Niko-Niko, Personal Map e Moving Motivators seguem sem regra de negócio, modelo de dados ou tela (PRD seção 5)
+### Moving Motivators — concluído (PRD seção 3.2.3)
+
+Primeira prática nomeada do Management 3.0. **Diferente dos dois jogos anteriores: é dado
+pessoal e é persistido** — perder ao recarregar não faria sentido num perfil.
+
+- [x] Migration `0003_motivators`: enum `motivator` com os 10 valores e tabela `user_motivators`
+- [x] Modelo **normalizado** (uma linha por motivador) em vez de JSON — o banco garante as invariantes e habilita agregação por time em SQL
+- [x] `domain`: `Motivator`, lista canônica, `MotivatorRanking`, `MotivatorRepository`
+- [x] `repository`: `Replace` apaga e regrava em transação única (um UPDATE posição a posição violaria a unicidade no meio do caminho)
+- [x] `usecase`: exige **permutação completa dos 10**; recusa lista parcial, repetida ou desconhecida
+- [x] `GET /api/v1/me/motivators` e `PUT /api/v1/me/motivators` (PUT porque substitui, não mescla)
+- [x] Frontend: bloco no perfil com arraste **e** setas — só o arraste deixaria a dinâmica inacessível por teclado e falharia em toque
+- [x] Top 3 destacado, data do último preenchimento, botão Desfazer, aviso para quem nunca respondeu
+- [x] Cliente HTTP e CORS passaram a aceitar `PUT`
+- [x] **9 testes unitários** novos (total do backend: **70**)
+- [x] Verificado de ponta a ponta: validações (400 para parcial/vazia/repetida/inválida), persistência, regravação sem acumular, isolamento entre usuários, e as restrições do banco recusando posição duplicada e fora de 1..10
+
+### Revisão a cada 90 dias — concluído
+- [x] `PeriodoRevisaoDias = 90` e os cálculos no **domínio**, não no frontend — a regra tem uma fonte da verdade só
+- [x] `DiasDesdeResposta`, `PrecisaRevisar` e `DiasParaRevisar`, com corte **inclusivo** no 90º dia
+- [x] Contagem por períodos completos de 24h (não por virada de calendário) e proteção contra relógio para trás
+- [x] API expõe `daysSinceAnswer`, `daysUntilReview`, `reviewPeriodDays` e `needsReview`
+- [x] Tela mostra "respondido há N dias · próxima revisão em M dias"; ao vencer, faixa de alerta com os dias de atraso
+- [x] Salvar zera o contador
+- [x] **5 testes unitários** no pacote `domain`, um deles cobrindo 7 faixas de tempo (total do backend: **75**, em 2 pacotes)
+- [x] Verificado contra o banco com respostas retrodatadas: 0, 45, 89, 90 e 120 dias
+
+### Decisões registradas (2026-09-10)
+- **Gestor verá os motivadores do time, pelo Dashboard** — não pela tela de perfil. Entra junto com o Dashboard, que segue não especificado (PRD seção 5).
+- **Sem histórico de respostas.** Guarda-se apenas a data da última. Se a evolução no tempo passar a interessar, vira épico próprio.
+
+### Radar do Time — concluído (PRD seção 3.2.4)
+
+- [x] `GET /api/v1/teams/{teamId}/motivators` — placar agregado do time
+- [x] `domain.AgregarMotivators`: contagem de Borda (1º = 10 pontos, 10º = 1), lógica pura e testável
+- [x] `repository.FindByUsers`: uma consulta só para todos os membros, em vez de uma por pessoa
+- [x] Reaproveita `requireTeamManager` do `TeamUseCase` em vez de duplicar a regra de acesso
+- [x] **Somente agregado:** o ranking individual nunca sai na resposta; pendentes trazem só nome e situação
+- [x] Resposta com revisão vencida continua contando no placar, mas a pessoa entra em pendentes
+- [x] Rota `/radar` e item "Radar" no menu, restritos a Admin e Gestor
+- [x] Frontend: gráfico de radar em SVG puro (sem biblioteca), placar com barras, KPIs de cobertura e lista de pendentes
+- [x] **11 testes unitários** novos (total do backend: **100**, em 2 pacotes)
+- [x] Verificado por HTTP: Colaborador **403**, Admin e Gestor do time **200**, e a soma dos scores igual a 55 — propriedade da contagem de Borda que valida a fórmula
+
+### Dados de demonstração
+Semeadas respostas aleatórias para os 4 membros do Squad Neon, com datas distribuídas de
+propósito (5, 40, 75 e 105 dias) para a tela exibir tanto "em dia" quanto revisão vencida.
+
+### Pendências
+- [ ] **Calibrar o visual com o exemplo do usuário** — o anexo de referência não chegou em duas tentativas; a versão atual assume gráfico de radar a partir do nome da tela
+- [ ] Decidir se o Gestor pode ver o ranking individual de alguém do time (hoje, deliberadamente, não)
+
+### Demais práticas Management 3.0 — fora de escopo
+- [ ] Kudo Box, Niko-Niko e Personal Map seguem sem regra de negócio, modelo de dados ou tela (PRD seção 5)
 
 ---
 
@@ -177,9 +229,8 @@ aderência, é removida. Por isso nasceu sem persistência — a remoção não 
 - [x] **19 testes unitários** novos de autenticação, perfil e cadastro (total do backend: **51**)
 
 ### Pendências relacionadas
-- [ ] Recuperação de senha por e-mail ("esqueci minha senha") — **bloqueador para produção**
-- [ ] Reset de senha de terceiros pelo Admin
-- [ ] Revogação de sessão ao trocar a senha (hoje os tokens emitidos seguem válidos até expirar)
+- [ ] Recuperação de senha por e-mail ("esqueci minha senha") — o reset pelo Admin cobre o caso comum, mas se o único Admin perder a senha ainda depende do banco
+- [ ] Revogação de sessão ao trocar ou redefinir a senha (hoje os tokens emitidos seguem válidos até expirar)
 - [ ] Troca de e-mail com fluxo de confirmação
 
 ---
@@ -204,6 +255,23 @@ aderência, é removida. Por isso nasceu sem persistência — a remoção não 
 O middleware passou a consultar o banco por requisição (leitura por chave primária). Era a
 alternativa a uma inativação que só surtiria efeito quando o token expirasse — para uma ação
 de segurança, atraso de horas equivale a não funcionar.
+
+---
+
+## Fase 4.4 — Papel e senha de terceiros pelo Admin (PRD seção 3.4.1 e 3.4.2)
+
+Motivação concreta: em três ocasiões a falta desses recursos obrigou a alterar o banco
+direto para tarefas triviais de administração.
+
+- [x] `PATCH /api/v1/users/{userId}/role` — Admin altera o papel global
+- [x] `POST /api/v1/users/{userId}/reset-password` — Admin define nova senha sem informar a antiga
+- [x] `domain`: `UpdateRole` e `ManagesActiveTeam` (papel de gestão em time ativo, Principal **ou** Apoio)
+- [x] Guardas de papel: Admin não altera o próprio; não rebaixa a Colaborador quem gere time ativo (time arquivado pode); `AUDITOR` recusado
+- [x] Guardas de senha: mínimo de 8 caracteres; **Admin não redefine a própria por aqui** — usa o perfil, que exige a senha atual, para que sessão roubada não tranque o dono fora
+- [x] Resposta 204 sem corpo no reset: a senha nunca é ecoada de volta
+- [x] Frontend: botões "Papel" e "Senha" por linha na tela de Usuários, com diálogos e confirmação de senha
+- [x] **13 testes unitários** novos (total do backend: **88**)
+- [x] Verificado por HTTP: as 6 guardas retornando 409/400/403, promoção e rebaixamento reais, e o fluxo completo de reset (204 → nova senha entra, antiga é recusada)
 
 ---
 

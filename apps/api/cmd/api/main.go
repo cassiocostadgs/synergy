@@ -52,6 +52,7 @@ func run(logger *slog.Logger) error {
 	profiles := repository.NewProfileRepository(pool)
 	teams := repository.NewTeamRepository(pool)
 	members := repository.NewTeamMemberRepository(pool)
+	motivators := repository.NewMotivatorRepository(pool)
 
 	// Infraestrutura de autenticação
 	hasher := auth.NewBcryptHasher()
@@ -59,11 +60,13 @@ func run(logger *slog.Logger) error {
 
 	// Casos de uso
 	authUC := usecase.NewAuthUseCase(users, profiles, members, hasher, tokens)
-	teamUC := usecase.NewTeamUseCase(teams, members, users)
+	teamUC := usecase.NewTeamUseCase(teams, members, users, motivators)
+	motivatorUC := usecase.NewMotivatorUseCase(motivators)
 
 	router := handler.NewRouter(handler.RouterConfig{
 		Auth:           authUC,
 		Teams:          teamUC,
+		Motivators:     motivatorUC,
 		TokenParser:    tokens,
 		Sessions:       authUC,
 		Logger:         logger,

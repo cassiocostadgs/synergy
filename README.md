@@ -221,14 +221,19 @@ handler  →  usecase  →  domain  ←  repository
 | GET | `/api/v1/me` | autenticado |
 | PATCH | `/api/v1/me` | autenticado — edita nome e hobby próprios |
 | PATCH | `/api/v1/me/password` | autenticado — troca a própria senha (exige a atual) |
+| GET | `/api/v1/me/motivators` | autenticado — Moving Motivators próprio |
+| PUT | `/api/v1/me/motivators` | autenticado — substitui a ordenação dos 10 motivadores |
 | GET | `/api/v1/users` | Admin, Gestor |
 | POST | `/api/v1/users` | Admin |
 | PATCH | `/api/v1/users/{userId}/status` | Admin — ativa ou inativa um acesso |
+| PATCH | `/api/v1/users/{userId}/role` | Admin — altera o papel global |
+| POST | `/api/v1/users/{userId}/reset-password` | Admin — redefine a senha de outro usuário |
 | GET | `/api/v1/teams` | autenticado (Admin vê todos) |
 | POST | `/api/v1/teams` | Admin, Gestor |
 | GET | `/api/v1/teams/{teamId}` | membros do time / Admin |
 | PATCH | `/api/v1/teams/{teamId}` | Gestores do time / Admin |
 | POST | `/api/v1/teams/{teamId}/archive` | Gestores do time / Admin |
+| GET | `/api/v1/teams/{teamId}/motivators` | Gestores do time / Admin — Radar agregado |
 | GET | `/api/v1/teams/{teamId}/members` | membros do time / Admin |
 | POST | `/api/v1/teams/{teamId}/members` | Gestores do time / Admin |
 | PATCH | `/api/v1/teams/{teamId}/members/{userId}` | Gestores do time / Admin |

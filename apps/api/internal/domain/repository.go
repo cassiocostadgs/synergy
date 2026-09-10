@@ -19,6 +19,8 @@ type UserRepository interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 	// UpdateStatus ativa ou inativa o usuário.
 	UpdateStatus(ctx context.Context, userID uuid.UUID, status UserStatus) error
+	// UpdateRole altera o papel global do usuário.
+	UpdateRole(ctx context.Context, userID uuid.UUID, role Role) error
 }
 
 // ProfileRepository abstrai a persistência do perfil/gamificação.
@@ -55,4 +57,8 @@ type TeamMemberRepository interface {
 	// LeadsActiveTeam informa se o usuário é Gestor Principal de algum time ativo.
 	// Usado para impedir que a liderança de um time fique com alguém inativo.
 	LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
+	// ManagesActiveTeam informa se o usuário exerce QUALQUER papel de gestão
+	// (Principal ou Apoio) em algum time ativo. Usado para impedir que ele seja
+	// rebaixado a Colaborador global enquanto gere um time.
+	ManagesActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
 }

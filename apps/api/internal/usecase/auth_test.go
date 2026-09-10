@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/db1group/synergy/apps/api/internal/domain"
 )
 
@@ -347,6 +349,164 @@ func TestSetUserStatus_MesmoStatusEhNoOp(t *testing.T) {
 	if user.Status != domain.UserStatusActive {
 		t.Errorf("esperava ACTIVE, obtive %s", user.Status)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Alteração de papel pelo Admin
+// ---------------------------------------------------------------------------
+
+func TestSetUserRole_ApenasAdmin(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Ana", domain.RoleGestor)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	_, err := h.auth.SetUserRole(context.Background(), gestor, alvo.UserID, domain.RoleAdmin)
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestSetUserRole_PromoveERebaixa(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	promovido, err := h.auth.SetUserRole(context.Background(), admin, alvo.UserID, domain.RoleGestor)
+	requireNoError(t, err)
+	if promovido.Role != domain.RoleGestor {
+		t.Errorf("esperava GESTOR, obtive %s", promovido.Role)
+	}
+
+	rebaixado, err := h.auth.SetUserRole(context.Background(), admin, alvo.UserID, domain.RoleColaborador)
+	requireNoError(t, err)
+	if rebaixado.Role != domain.RoleColaborador {
+		t.Errorf("esperava COLABORADOR, obtive %s", rebaixado.Role)
+	}
+}
+
+func TestSetUserRole_AdminNaoAlteraOProprioPapel(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+
+	// Rebaixar-se poderia deixar o sistema sem nenhum Admin.
+	_, err := h.auth.SetUserRole(context.Background(), admin, admin.UserID, domain.RoleColaborador)
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestSetUserRole_RejeitaPapelForaDoMVP(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	_, err := h.auth.SetUserRole(context.Background(), admin, alvo.UserID, domain.RoleAuditor)
+	requireCode(t, err, domain.CodeValidation)
+}
+
+func TestSetUserRole_NaoRebaixaQuemGereTimeAtivo(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	principal := h.newUser("Carla", domain.RoleGestor)
+	apoio := h.newUser("Diego", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", principal)
+
+	_, err := h.teams.AddMember(context.Background(), principal, team.ID, apoio.UserID, domain.TeamRoleGestorApoio)
+	requireNoError(t, err)
+
+	// Papel de gestão em time exige Gestor/Admin global: rebaixar quebraria isso.
+	_, err = h.auth.SetUserRole(context.Background(), admin, principal.UserID, domain.RoleColaborador)
+	requireCode(t, err, domain.CodeConflict)
+
+	_, err = h.auth.SetUserRole(context.Background(), admin, apoio.UserID, domain.RoleColaborador)
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestSetUserRole_RebaixaQuemGereApenasTimeArquivado(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	team := h.newTeam("Squad Neon", gestor)
+
+	_, err := h.teams.Archive(context.Background(), gestor, team.ID)
+	requireNoError(t, err)
+
+	_, err = h.auth.SetUserRole(context.Background(), admin, gestor.UserID, domain.RoleColaborador)
+	requireNoError(t, err)
+}
+
+func TestSetUserRole_PromoverQuemGereTimeEhPermitido(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	h.newTeam("Squad Neon", gestor)
+
+	// Subir para Admin não viola nada: Admin também pode gerir time.
+	_, err := h.auth.SetUserRole(context.Background(), admin, gestor.UserID, domain.RoleAdmin)
+	requireNoError(t, err)
+}
+
+func TestSetUserRole_MesmoPapelEhNoOp(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	user, err := h.auth.SetUserRole(context.Background(), admin, alvo.UserID, domain.RoleColaborador)
+	requireNoError(t, err)
+	if user.Role != domain.RoleColaborador {
+		t.Errorf("esperava COLABORADOR, obtive %s", user.Role)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Redefinição de senha pelo Admin
+// ---------------------------------------------------------------------------
+
+func TestResetUserPassword_ApenasAdmin(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Ana", domain.RoleGestor)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	err := h.auth.ResetUserPassword(context.Background(), gestor, alvo.UserID, "senha-nova-1")
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestResetUserPassword_DefineNovaSenhaSemExigirAAntiga(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUserComSenha("Bruno", domain.RoleColaborador, "senha-esquecida")
+
+	// É o ponto do recurso: o Admin não sabe a senha atual do usuário.
+	requireNoError(t, h.auth.ResetUserPassword(context.Background(), admin, alvo.UserID, "senha-nova-1"))
+
+	_, err := h.auth.Login(context.Background(), "bruno@synergy.dev", "senha-nova-1")
+	requireNoError(t, err)
+
+	_, err = h.auth.Login(context.Background(), "bruno@synergy.dev", "senha-esquecida")
+	requireCode(t, err, domain.CodeUnauthorized)
+}
+
+func TestResetUserPassword_AdminNaoRedefineAPropria(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+
+	// Para a própria senha existe ChangePassword, que exige a atual — assim uma
+	// sessão de Admin roubada não tranca o dono fora.
+	err := h.auth.ResetUserPassword(context.Background(), admin, admin.UserID, "senha-nova-1")
+	requireCode(t, err, domain.CodeConflict)
+}
+
+func TestResetUserPassword_RejeitaSenhaCurta(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	alvo := h.newUser("Bruno", domain.RoleColaborador)
+
+	err := h.auth.ResetUserPassword(context.Background(), admin, alvo.UserID, "1234567")
+	requireCode(t, err, domain.CodeValidation)
+}
+
+func TestResetUserPassword_UsuarioInexistente(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+
+	err := h.auth.ResetUserPassword(context.Background(), admin, uuid.New(), "senha-nova-1")
+	requireCode(t, err, domain.CodeNotFound)
 }
 
 // ---------------------------------------------------------------------------
