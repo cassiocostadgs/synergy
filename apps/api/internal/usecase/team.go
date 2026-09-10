@@ -356,8 +356,13 @@ type MembroDoRadar struct {
 }
 
 // MotivatorsDoTime é a visão dos motivadores de um time (o "Radar").
+//
+// Todas as contagens e o placar consideram **apenas os colaboradores** do time:
+// quem exerce papel de gestão fica fora, inclusive dos números.
 type MotivatorsDoTime struct {
-	Time         *domain.Team
+	Time *domain.Team
+	// TotalMembros conta só colaboradores. Zero significa um time formado
+	// apenas por gestores — situação normal em time recém-criado.
 	TotalMembros int
 	Responderam  int
 	Placar       []domain.MotivatorTeamScore
@@ -391,9 +396,21 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		return nil, err
 	}
 
-	membros, err := uc.members.ListByTeam(ctx, team.ID)
+	todos, err := uc.members.ListByTeam(ctx, team.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	// O Radar retrata os colaboradores, não quem os gere: a visão existe para o
+	// gestor olhar a equipe. Incluir a resposta dele misturaria quem observa com
+	// quem é observado, e num time pequeno a própria resposta chegaria a
+	// dominar a média.
+	membros := make([]domain.TeamMemberView, 0, len(todos))
+	for _, membro := range todos {
+		if membro.Role.IsManager() {
+			continue
+		}
+		membros = append(membros, membro)
 	}
 
 	ids := make([]uuid.UUID, 0, len(membros))

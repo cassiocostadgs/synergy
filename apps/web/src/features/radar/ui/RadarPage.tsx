@@ -50,7 +50,7 @@ export function RadarPage() {
     <>
       <PageHeader
         title="Radar"
-        subtitle="O que move o time, a partir das respostas de Moving Motivators"
+        subtitle="O que move os colaboradores do time, a partir das respostas de Moving Motivators"
         actions={
           ativos.length > 1 ? (
             <div className="min-w-52">
@@ -95,13 +95,26 @@ function ConteudoDoRadar({ data }: { data: TeamMotivators }) {
   const naoResponderam = data.pending.filter((membro) => !membro.answered)
   const revisaoVencida = data.pending.filter((membro) => membro.answered)
 
+  // Time recém-criado só tem o Gestor Principal, que fica fora do Radar.
+  if (data.membersTotal === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon="person_add"
+          title="Este time ainda não tem colaboradores"
+          description={`O Radar retrata os colaboradores do time — quem exerce papel de gestão fica fora. Adicione pessoas ao ${data.team.name} pelo painel de membros.`}
+        />
+      </Card>
+    )
+  }
+
   if (data.membersAnswered === 0) {
     return (
       <Card>
         <EmptyState
           icon="radar"
-          title="Ninguém do time respondeu ainda"
-          description={`O radar aparece quando ao menos uma pessoa do ${data.team.name} preencher os motivadores no próprio perfil.`}
+          title="Nenhum colaborador respondeu ainda"
+          description={`O radar aparece quando ao menos um colaborador do ${data.team.name} preencher os motivadores no próprio perfil.`}
         />
       </Card>
     )
@@ -116,7 +129,7 @@ function ConteudoDoRadar({ data }: { data: TeamMotivators }) {
           compact
           label="Responderam"
           value={`${data.membersAnswered}/${data.membersTotal}`}
-          hint={`${cobertura}% do time`}
+          hint={`${cobertura}% dos colaboradores`}
           icon="how_to_reg"
         />
         <KpiCard

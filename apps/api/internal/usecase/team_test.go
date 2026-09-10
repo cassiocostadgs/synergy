@@ -514,18 +514,82 @@ func TestMotivatorsOverview_ContabilizaRespostasEPendentes(t *testing.T) {
 	visao, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
 	requireNoError(t, err)
 
-	if visao.TotalMembros != 3 {
-		t.Errorf("esperava 3 membros, obtive %d", visao.TotalMembros)
+	// O time tem 3 pessoas, mas a gestora Carla fica fora da conta.
+	if visao.TotalMembros != 2 {
+		t.Errorf("esperava 2 colaboradores, obtive %d", visao.TotalMembros)
 	}
 	if visao.Responderam != 1 {
 		t.Errorf("esperava 1 resposta, obtive %d", visao.Responderam)
 	}
-	// Carla e Elis não responderam.
-	if len(visao.Pendentes) != 2 {
-		t.Errorf("esperava 2 pendentes, obtive %d: %+v", len(visao.Pendentes), visao.Pendentes)
+	// Só Elis não respondeu; a gestora não entra em pendentes.
+	if len(visao.Pendentes) != 1 {
+		t.Errorf("esperava 1 pendente, obtive %d: %+v", len(visao.Pendentes), visao.Pendentes)
 	}
 	if len(visao.Placar) != domain.TotalMotivators {
 		t.Errorf("o placar deve trazer os %d motivadores, obtive %d", domain.TotalMotivators, len(visao.Placar))
+	}
+}
+
+func TestMotivatorsOverview_GestoresFicamForaDeTudo(t *testing.T) {
+	h := newHarness(t)
+	principal := h.newUser("Carla", domain.RoleGestor)
+	apoio := h.newUser("Diego", domain.RoleGestor)
+	colaborador := h.newUser("Bruno", domain.RoleColaborador)
+	team := h.newTeam("Squad Neon", principal)
+
+	_, err := h.teams.AddMember(context.Background(), principal, team.ID, apoio.UserID, domain.TeamRoleGestorApoio)
+	requireNoError(t, err)
+	_, err = h.teams.AddMember(context.Background(), principal, team.ID, colaborador.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	// Os dois gestores respondem; o colaborador não.
+	_, err = h.motivators.Save(context.Background(), principal, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+	_, err = h.motivators.Save(context.Background(), apoio, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverview(context.Background(), principal, team.ID, time.Now())
+	requireNoError(t, err)
+
+	// O time tem 3 pessoas, mas o Radar retrata apenas o colaborador.
+	if visao.TotalMembros != 1 {
+		t.Errorf("esperava 1 membro (só colaboradores), obtive %d", visao.TotalMembros)
+	}
+	if visao.Responderam != 0 {
+		t.Errorf("as respostas dos gestores não devem contar, esperava 0, obtive %d", visao.Responderam)
+	}
+	if len(visao.Membros) != 1 || visao.Membros[0].Nome != "Bruno" {
+		t.Errorf("esperava apenas Bruno na matriz, obtive %+v", visao.Membros)
+	}
+	// Sem respostas de colaborador, o placar fica zerado.
+	for _, item := range visao.Placar {
+		if item.Score != 0 {
+			t.Errorf("%s: placar deveria estar zerado, obtive %v", item.Motivator, item.Score)
+			break
+		}
+	}
+	// E o gestor não entra na lista de pendentes.
+	for _, pendente := range visao.Pendentes {
+		if pendente.Nome == "Carla" || pendente.Nome == "Diego" {
+			t.Errorf("gestor não deveria aparecer em pendentes: %s", pendente.Nome)
+		}
+	}
+}
+
+func TestMotivatorsOverview_TimeSoComGestores(t *testing.T) {
+	h := newHarness(t)
+	principal := h.newUser("Carla", domain.RoleGestor)
+	team := h.newTeam("Squad Novo", principal)
+
+	// Time recém-criado só tem o Gestor Principal: situação normal, não erro.
+	visao, err := h.teams.MotivatorsOverview(context.Background(), principal, team.ID, time.Now())
+	requireNoError(t, err)
+
+	if visao.TotalMembros != 0 {
+		t.Errorf("esperava 0 colaboradores, obtive %d", visao.TotalMembros)
+	}
+	if len(visao.Membros) != 0 {
+		t.Errorf("esperava matriz vazia, obtive %d linhas", len(visao.Membros))
 	}
 }
 
@@ -547,9 +611,10 @@ func TestMotivatorsOverview_MapaDeCalorTrazTodosDoTime(t *testing.T) {
 	visao, err := h.teams.MotivatorsOverview(context.Background(), gestor, team.ID, time.Now())
 	requireNoError(t, err)
 
-	// Todos aparecem, inclusive quem não respondeu — a linha vazia mostra quem falta.
-	if len(visao.Membros) != 3 {
-		t.Fatalf("esperava 3 linhas no mapa de calor, obtive %d", len(visao.Membros))
+	// Todo colaborador aparece, inclusive quem não respondeu — a linha vazia
+	// mostra quem falta. A gestora Carla fica fora.
+	if len(visao.Membros) != 2 {
+		t.Fatalf("esperava 2 linhas no mapa de calor, obtive %d", len(visao.Membros))
 	}
 
 	porNome := map[string]MembroDoRadar{}
@@ -581,18 +646,24 @@ func TestMotivatorsOverview_MapaDeCalorTrazTodosDoTime(t *testing.T) {
 		t.Errorf("quem não respondeu não deve ter posições, obtive %d", len(elis.Posicoes))
 	}
 
-	carla := porNome["Carla"]
-	if carla.PapelNoTime != domain.TeamRoleGestorPrincipal {
-		t.Errorf("esperava o papel no time na linha, obtive %q", carla.PapelNoTime)
+	if _, apareceu := porNome["Carla"]; apareceu {
+		t.Error("a gestora do time não deveria aparecer na matriz")
+	}
+	if bruno.PapelNoTime != domain.TeamRoleColaborador {
+		t.Errorf("esperava o papel no time na linha, obtive %q", bruno.PapelNoTime)
 	}
 }
 
 func TestMotivatorsOverview_RevisaoVencidaEntraComoPendente(t *testing.T) {
 	h := newHarness(t)
 	gestor := h.newUser("Carla", domain.RoleGestor)
+	// A resposta precisa ser de um colaborador: a do gestor fica fora do Radar.
+	membro := h.newUser("Bruno", domain.RoleColaborador)
 	team := h.newTeam("Squad Neon", gestor)
 
-	_, err := h.motivators.Save(context.Background(), gestor, domain.MotivatorsCanonicos)
+	_, err := h.teams.AddMember(context.Background(), gestor, team.ID, membro.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+	_, err = h.motivators.Save(context.Background(), membro, domain.MotivatorsCanonicos)
 	requireNoError(t, err)
 
 	// Agora está em dia...

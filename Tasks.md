@@ -198,7 +198,9 @@ pessoal e é persistido** — perder ao recarregar não faria sentido num perfil
 - [x] ~~Somente agregado~~ → **revertido em 2026-09-10 por decisão de produto:** a resposta passou a incluir o ranking individual de cada membro, para alimentar o **mapa de calor**. O controle de acesso (Admin e Gestor do próprio time) é o que sustenta a exposição
 - [x] Mapa de calor individual: matriz pessoa × motivador, células coloridas por faixa (1–3 alta, 4–7 média, 8–10 baixa), substituindo a tabela de placar
 - [x] Colunas ordenadas pela força no time, para as células de alta prioridade se agruparem à esquerda
-- [x] Todos do time aparecem, inclusive quem não respondeu (linha tracejada) e quem tem revisão vencida (ícone ao lado do nome)
+- [x] Todos os colaboradores aparecem, inclusive quem não respondeu (linha tracejada) e quem tem revisão vencida (ícone ao lado do nome)
+- [x] **Gestores ficam fora do Radar** (decisão de 2026-09-10): fora da matriz, do gráfico, dos destaques e da cobertura — os números refletem exatamente o que está na tela. Estado vazio próprio para time só com gestores
+- [x] Gráfico ocupa metade do espaço (duas colunas iguais)
 - [x] Resposta com revisão vencida continua contando no placar, mas a pessoa entra em pendentes
 - [x] Rota `/radar` e item "Radar" no menu, restritos a Admin e Gestor
 - [x] Frontend: gráfico de radar em SVG puro (sem biblioteca), placar com barras, KPIs de cobertura e lista de pendentes

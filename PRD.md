@@ -113,7 +113,8 @@ tela própria no menu ("Radar").
   * Rankings incompletos são ignorados na média, para não distorcer os motivadores que contêm.
   * Uma resposta com revisão vencida **continua contando** no placar — ela é a informação mais recente que existe — mas a pessoa é marcada como pendente.
   * As colunas do mapa de calor seguem a **ordem de força no time**, não a ordem canônica: assim as células de alta prioridade se agrupam à esquerda e quem discorda do time salta aos olhos.
-  * **Todos do time aparecem** no mapa, inclusive quem não respondeu — a linha fica tracejada, mostrando a lacuna sem precisar cruzar com outra lista.
+  * **Todos os colaboradores aparecem** no mapa, inclusive quem não respondeu — a linha fica tracejada, mostrando a lacuna sem precisar cruzar com outra lista.
+  * **Quem exerce papel de gestão no time (Principal ou Apoio) fica fora do Radar** — da matriz, do gráfico, dos destaques e da contagem de cobertura. A visão existe para o gestor olhar a equipe; incluir a resposta dele misturaria quem observa com quem é observado, e num time pequeno a própria resposta chegaria a dominar a média. Um time formado apenas por gestores exibe estado vazio explicando isso, situação normal em time recém-criado.
 * **Acesso e privacidade:** **Admin** e **Gestor**; o Colaborador não tem acesso (item ausente do menu, rota protegida e API recusando com 403). O Gestor só vê os times em que exerce papel de gestão — a mesma regra da administração de membros (RN2).
   > **Decisão de 2026-09-10:** a primeira versão desta tela era **somente agregada**, por serem os motivadores um dado pessoal sensível. A decisão de produto foi **expor o ranking individual** de cada membro para quem gere o time, por meio do mapa de calor. O acesso restrito a Gestor do próprio time e Admin é o que sustenta essa exposição, e o Colaborador segue sem ver o de ninguém — nem o dos colegas, nem o próprio time.
 
