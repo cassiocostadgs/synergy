@@ -57,6 +57,10 @@ type TeamMemberRepository interface {
 	// LeadsActiveTeam informa se o usuário é Gestor Principal de algum time ativo.
 	// Usado para impedir que a liderança de um time fique com alguém inativo.
 	LeadsActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error)
+	// ListRolesByUser devolve, por time, o papel que o usuário exerce nele.
+	// Serve para a interface saber o que ele pode fazer em cada time sem uma
+	// consulta por time.
+	ListRolesByUser(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]TeamRole, error)
 	// ManagesActiveTeam informa se o usuário exerce QUALQUER papel de gestão
 	// (Principal ou Apoio) em algum time ativo. Usado para impedir que ele seja
 	// rebaixado a Colaborador global enquanto gere um time.

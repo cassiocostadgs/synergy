@@ -201,6 +201,11 @@ pessoal e é persistido** — perder ao recarregar não faria sentido num perfil
 - [x] Todos os colaboradores aparecem, inclusive quem não respondeu (linha tracejada) e quem tem revisão vencida (ícone ao lado do nome)
 - [x] **Gestores ficam fora do Radar** (decisão de 2026-09-10): fora da matriz, do gráfico, dos destaques e da cobertura — os números refletem exatamente o que está na tela. Estado vazio próprio para time só com gestores
 - [x] Gráfico ocupa metade do espaço (duas colunas iguais)
+- [x] **Filtro por colaborador** em lista de seleção (`Select`) com os colaboradores do time, validado contra o time corrente — trocar de time descarta uma seleção que não existe mais
+- [x] **Gráfico reage ao filtro sobrepondo** a série da pessoa (polígono tracejado em ciano) ao do time, que fica atenuado; legenda aparece só quando há duas séries. Sem chamada nova ao backend: a conversão de colocação em força (`11 - posição`) é a mesma contagem de Borda, e com um respondente não há média a fazer
+- [x] Filtro não recalcula o que é do time (polígono, destaques, cobertura) — a comparação pessoa × time é o objetivo da tela. Pessoa sem resposta não gera linha e a tela avisa
+- [x] Verificado contra os dados reais do Squad Neon: a média das forças individuais calculadas no cliente coincide com o score agregado do backend em todos os 10 motivadores (diferença 0,000000)
+- [x] **Corrigido: seletor de time listava times sem acesso.** `GET /teams` devolve todos os times que a pessoa integra, então um Gestor que fosse simples colaborador em outro time via aquele time no seletor e recebia 403 ao escolhê-lo. A listagem passou a informar `myRole` por time, e o seletor filtra pelos que a pessoa gere (Admin vê todos). Estado vazio próprio para Gestor que não gere nenhum time
 - [x] Resposta com revisão vencida continua contando no placar, mas a pessoa entra em pendentes
 - [x] Rota `/radar` e item "Radar" no menu, restritos a Admin e Gestor
 - [x] Frontend: gráfico de radar em SVG puro (sem biblioteca), placar com barras, KPIs de cobertura e lista de pendentes

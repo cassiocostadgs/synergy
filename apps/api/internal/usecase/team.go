@@ -98,13 +98,43 @@ func (uc *TeamUseCase) Get(ctx context.Context, actor domain.Actor, teamID uuid.
 	return team, nil
 }
 
+// TimeComPapel é um time acompanhado do papel que o ator exerce nele.
+// MeuPapel fica vazio quando o ator não é membro — caso possível para o Admin,
+// que vê todos os times.
+type TimeComPapel struct {
+	Time      domain.Team
+	MeuPapel  domain.TeamRole
+}
+
 // List retorna todos os times para o Admin e apenas os times do próprio usuário
-// para os demais papéis.
-func (uc *TeamUseCase) List(ctx context.Context, actor domain.Actor) ([]domain.Team, error) {
+// para os demais papéis, cada um com o papel que o ator exerce nele.
+//
+// O papel vai junto para a interface não precisar consultar os membros de cada
+// time só para saber o que o usuário pode fazer ali.
+func (uc *TeamUseCase) List(ctx context.Context, actor domain.Actor) ([]TimeComPapel, error) {
+	var (
+		times []domain.Team
+		err   error
+	)
 	if actor.IsAdmin() {
-		return uc.teams.List(ctx)
+		times, err = uc.teams.List(ctx)
+	} else {
+		times, err = uc.teams.ListByUser(ctx, actor.UserID)
 	}
-	return uc.teams.ListByUser(ctx, actor.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	papeis, err := uc.members.ListRolesByUser(ctx, actor.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	resultado := make([]TimeComPapel, 0, len(times))
+	for _, time := range times {
+		resultado = append(resultado, TimeComPapel{Time: time, MeuPapel: papeis[time.ID]})
+	}
+	return resultado, nil
 }
 
 // Update altera os dados cadastrais do time.

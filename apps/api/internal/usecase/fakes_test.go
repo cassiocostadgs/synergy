@@ -304,6 +304,19 @@ func (r fakeMemberRepo) LeadsActiveTeam(_ context.Context, userID uuid.UUID) (bo
 	return false, nil
 }
 
+func (r fakeMemberRepo) ListRolesByUser(
+	_ context.Context,
+	userID uuid.UUID,
+) (map[uuid.UUID]domain.TeamRole, error) {
+	papeis := map[uuid.UUID]domain.TeamRole{}
+	for _, member := range r.store.members {
+		if member.UserID == userID {
+			papeis[member.TeamID] = member.Role
+		}
+	}
+	return papeis, nil
+}
+
 func (r fakeMemberRepo) ManagesActiveTeam(_ context.Context, userID uuid.UUID) (bool, error) {
 	for _, member := range r.store.members {
 		if member.UserID != userID || !member.Role.IsManager() {

@@ -432,8 +432,48 @@ func TestList_ScopesToUserTeams(t *testing.T) {
 
 	meus, err := h.teams.List(context.Background(), gestorA)
 	requireNoError(t, err)
-	if len(meus) != 1 || meus[0].Name != "Squad A" {
+	if len(meus) != 1 || meus[0].Time.Name != "Squad A" {
 		t.Errorf("Gestor deveria ver apenas o próprio time, obtive %+v", meus)
+	}
+	// A listagem informa o papel do ator em cada time, para a interface saber o
+	// que ele pode fazer ali sem consultar os membros.
+	if meus[0].MeuPapel != domain.TeamRoleGestorPrincipal {
+		t.Errorf("esperava o papel na listagem, obtive %q", meus[0].MeuPapel)
+	}
+	// O Admin vê times de que não é membro: nesses, o papel vem vazio.
+	for _, item := range todos {
+		if item.MeuPapel != "" {
+			t.Errorf("Admin não é membro de %s; esperava papel vazio, obtive %q", item.Time.Name, item.MeuPapel)
+		}
+	}
+}
+
+func TestList_PapelReflateOTimeCorreto(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	outroGestor := h.newUser("Diego", domain.RoleGestor)
+
+	// Gestora principal em um time e simples colaboradora em outro.
+	proprio := h.newTeam("Squad Proprio", gestor)
+	alheio := h.newTeam("Squad Alheio", outroGestor)
+	_, err := h.teams.AddMember(context.Background(), outroGestor, alheio.ID, gestor.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	times, err := h.teams.List(context.Background(), gestor)
+	requireNoError(t, err)
+	if len(times) != 2 {
+		t.Fatalf("esperava 2 times, obtive %d", len(times))
+	}
+
+	porID := map[string]domain.TeamRole{}
+	for _, item := range times {
+		porID[item.Time.ID.String()] = item.MeuPapel
+	}
+	if porID[proprio.ID.String()] != domain.TeamRoleGestorPrincipal {
+		t.Errorf("no time próprio esperava GESTOR_PRINCIPAL, obtive %q", porID[proprio.ID.String()])
+	}
+	if porID[alheio.ID.String()] != domain.TeamRoleColaborador {
+		t.Errorf("no time alheio esperava COLABORADOR, obtive %q", porID[alheio.ID.String()])
 	}
 }
 

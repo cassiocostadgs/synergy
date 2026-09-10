@@ -293,6 +293,33 @@ func (r *TeamMemberRepository) LeadsActiveTeam(ctx context.Context, userID uuid.
 	return lidera, nil
 }
 
+func (r *TeamMemberRepository) ListRolesByUser(
+	ctx context.Context,
+	userID uuid.UUID,
+) (map[uuid.UUID]domain.TeamRole, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT team_id, role::text
+		FROM team_members
+		WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	papeis := map[uuid.UUID]domain.TeamRole{}
+	for rows.Next() {
+		var (
+			teamID uuid.UUID
+			papel  string
+		)
+		if err := rows.Scan(&teamID, &papel); err != nil {
+			return nil, err
+		}
+		papeis[teamID] = domain.TeamRole(papel)
+	}
+	return papeis, rows.Err()
+}
+
 func (r *TeamMemberRepository) ManagesActiveTeam(ctx context.Context, userID uuid.UUID) (bool, error) {
 	var gere bool
 	err := r.pool.QueryRow(ctx, `

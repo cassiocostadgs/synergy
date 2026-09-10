@@ -228,7 +228,7 @@ handler  →  usecase  →  domain  ←  repository
 | PATCH | `/api/v1/users/{userId}/status` | Admin — ativa ou inativa um acesso |
 | PATCH | `/api/v1/users/{userId}/role` | Admin — altera o papel global |
 | POST | `/api/v1/users/{userId}/reset-password` | Admin — redefine a senha de outro usuário |
-| GET | `/api/v1/teams` | autenticado (Admin vê todos) |
+| GET | `/api/v1/teams` | autenticado (Admin vê todos) — cada time traz `myRole`, o papel de quem pediu |
 | POST | `/api/v1/teams` | Admin, Gestor |
 | GET | `/api/v1/teams/{teamId}` | membros do time / Admin |
 | PATCH | `/api/v1/teams/{teamId}` | Gestores do time / Admin |

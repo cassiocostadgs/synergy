@@ -20,8 +20,10 @@ import { ROLE_LABEL } from '@/types'
 /**
  * Perfil do próprio usuário: dados cadastrais e troca de senha (PRD seção 3.3).
  *
- * Tudo em um cartão só, em fluxo vertical — dividir em dois blocos lado a lado
- * criava duas colunas competindo pela atenção sem necessidade.
+ * Cadastro e senha ficam num cartão só, em fluxo vertical — quebrar os próprios
+ * campos em blocos lado a lado criava colunas competindo pela atenção. Já os
+ * motivadores são outra dinâmica, então ocupam cartão à parte, ao lado em telas
+ * largas.
  *
  * XP e nível existem no modelo de dados e vêm na resposta de `GET /me`, mas não
  * são exibidos: não há nenhuma regra que os altere, então todo usuário ficaria
@@ -40,8 +42,15 @@ export function ProfilePage() {
         subtitle="Seus dados cadastrais, sua senha e seus motivadores"
       />
 
-      <div className="space-y-4">
-        <Card className="max-w-2xl p-6 sm:p-8">
+      {/*
+        Duas colunas a partir de xl: cadastro e senha à esquerda, motivadores à
+        direita. Empilhado, os dois cartões ficavam estreitos com metade da tela
+        vazia ao lado, e a dinâmica só aparecia depois de rolar a página. Abaixo
+        de xl não caberiam duas colunas sem apertar os campos, então volta a
+        empilhar. O teto de largura evita cartões desproporcionais em ultrawide.
+      */}
+      <div className="grid max-w-[84rem] gap-4 xl:grid-cols-2 xl:items-start">
+        <Card className="p-6 sm:p-8">
           <Identificacao />
           <hr className="my-7 border-outline" />
           <FormDados />

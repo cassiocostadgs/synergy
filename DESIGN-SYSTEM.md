@@ -69,6 +69,7 @@ O sistema utiliza um layout fixo com duas barras de navegação principais:
 - **Rótulos:** dispostos radialmente, invertidos 180° na metade esquerda da roda para não ficarem de cabeça para baixo; tamanho de fonte proporcional à quantidade de setores, e omitidos acima de 16 setores.
 - **Ponteiro:** fixo no topo, na cor primária — é ele que define o setor vencedor.
 - **Animação:** 5 voltas com `cubic-bezier(0.16, 1, 0.3, 1)` e glow neon no conjunto. Respeita `prefers-reduced-motion`, entregando o resultado sem giro.
+- **Tamanho:** a roda ocupa a coluna elástica do layout, e a lista de temas fica numa faixa fixa — `18rem`, subindo a `22rem` a partir de `xl`. A roda tem teto de `34rem` para não virar um disco de tela cheia em monitor largo. Em geral: **quando uma tela tem um elemento gráfico e um formulário, a largura extra vai para o gráfico** — o contrário produz campo de texto gigante ao lado de um desenho pequeno.
 - **Regra de implementação:** o vencedor é sorteado **antes** da animação e a roda gira até ele. Nunca derive o vencedor do ângulo final.
 
 ### 4.4. Tabelas de Gestão (RBAC / Usuários / Teams)

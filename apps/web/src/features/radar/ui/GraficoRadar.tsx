@@ -40,21 +40,52 @@ function ponto(indice: number, total: number, distancia: number) {
   }
 }
 
-export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
+/**
+ * Série individual sobreposta ao polígono do time.
+ *
+ * `forcas` vem alinhada posição a posição com `scores`, então o componente não
+ * precisa saber a que motivador cada valor pertence — quem monta o array já
+ * resolveu isso.
+ */
+export interface SerieIndividual {
+  rotulo: string
+  forcas: number[]
+}
+
+export function GraficoRadar({
+  scores,
+  individual,
+}: {
+  scores: MotivatorScore[]
+  individual?: SerieIndividual
+}) {
   const total = scores.length
   if (total === 0) return null
 
-  const vertices = scores.map((item, indice) =>
-    ponto(indice, total, (Math.max(0, item.score) / ESCALA_MAXIMA) * RAIO),
-  )
+  const paraVertices = (valores: number[]) =>
+    valores.map((valor, indice) =>
+      ponto(indice, total, (Math.max(0, valor) / ESCALA_MAXIMA) * RAIO),
+    )
+
+  const vertices = paraVertices(scores.map((item) => item.score))
   const area = vertices.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`).join(' ')
+
+  const verticesIndividuais =
+    individual && individual.forcas.length === total ? paraVertices(individual.forcas) : null
+  const areaIndividual = verticesIndividuais
+    ?.map((v) => `${v.x.toFixed(1)},${v.y.toFixed(1)}`)
+    .join(' ')
 
   return (
     <svg
       viewBox={`0 0 ${LARGURA} ${ALTURA}`}
       className="w-full"
       role="img"
-      aria-label="Gráfico de radar dos motivadores do time"
+      aria-label={
+        verticesIndividuais
+          ? `Gráfico de radar dos motivadores do time, com a série de ${individual?.rotulo} sobreposta`
+          : 'Gráfico de radar dos motivadores do time'
+      }
     >
       <defs>
         <linearGradient id="radar-area" x1="0" y1="0" x2={LARGURA} y2={ALTURA}>
@@ -113,25 +144,51 @@ export function GraficoRadar({ scores }: { scores: MotivatorScore[] }) {
         )
       })}
 
-      {/* Área do time */}
+      {/* Área do time. Fica atrás para a série individual não ser encoberta. */}
       <polygon
         points={area}
         fill="url(#radar-area)"
         stroke="#ff2d78"
-        strokeWidth="2"
+        strokeWidth={verticesIndividuais ? 1.5 : 2}
         strokeLinejoin="round"
+        opacity={verticesIndividuais ? 0.6 : 1}
       />
 
-      {/* Vértices */}
+      {/* Vértices do time */}
       {vertices.map((v, indice) => (
         <circle
           key={scores[indice].motivator}
           cx={v.x}
           cy={v.y}
-          r="4"
-          fill={indice < 3 ? '#ff2d78' : '#00fbfb'}
+          r={verticesIndividuais ? 3 : 4}
+          fill="#ff2d78"
+          opacity={verticesIndividuais ? 0.6 : 1}
         />
       ))}
+
+      {/* Série individual, tracejada, por cima */}
+      {verticesIndividuais ? (
+        <>
+          <polygon
+            points={areaIndividual}
+            fill="#00fbfb"
+            fillOpacity="0.12"
+            stroke="#00fbfb"
+            strokeWidth="2.5"
+            strokeDasharray="7 5"
+            strokeLinejoin="round"
+          />
+          {verticesIndividuais.map((v, indice) => (
+            <circle
+              key={`individual-${scores[indice].motivator}`}
+              cx={v.x}
+              cy={v.y}
+              r="4"
+              fill="#00fbfb"
+            />
+          ))}
+        </>
+      ) : null}
     </svg>
   )
 }

@@ -70,8 +70,10 @@ export function Roleta({
   // Rótulo longo em muitos setores precisa de fonte menor para não vazar.
   const tamanhoFonte = total <= 6 ? 4.2 : total <= 10 ? 3.6 : 3
 
+  // O teto de largura existe para a roda não virar um disco de tela cheia em
+  // monitor largo; abaixo dele ela acompanha a coluna onde está.
   return (
-    <div className={cx('relative aspect-square w-full max-w-[26rem]', className)}>
+    <div className={cx('relative aspect-square w-full max-w-[34rem]', className)}>
       <svg
         viewBox="0 0 100 100"
         className="size-full drop-shadow-[0_0_18px_rgba(255,45,120,0.25)]"

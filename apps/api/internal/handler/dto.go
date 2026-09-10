@@ -100,9 +100,12 @@ type loginResponse struct {
 }
 
 type teamResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	// MyRole é o papel de quem fez a requisição neste time. Ausente quando não
+	// é membro — possível para o Admin, que enxerga todos os times.
+	MyRole    string    `json:"myRole,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
@@ -290,10 +293,12 @@ func toTeamResponse(team *domain.Team) teamResponse {
 	}
 }
 
-func toTeamResponses(teams []domain.Team) []teamResponse {
-	out := make([]teamResponse, 0, len(teams))
-	for i := range teams {
-		out = append(out, toTeamResponse(&teams[i]))
+func toTeamsComPapelResponse(times []usecase.TimeComPapel) []teamResponse {
+	out := make([]teamResponse, 0, len(times))
+	for i := range times {
+		item := toTeamResponse(&times[i].Time)
+		item.MyRole = string(times[i].MeuPapel)
+		out = append(out, item)
 	}
 	return out
 }

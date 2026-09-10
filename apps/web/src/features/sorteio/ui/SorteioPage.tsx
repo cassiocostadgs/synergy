@@ -114,7 +114,14 @@ export function SorteioPage() {
         subtitle="Gire a roda para escolher o tema da conversa. A lista não é salva — vale só para esta sessão."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,26rem)_1fr] lg:items-start">
+      {/*
+        A roda fica na coluna elástica e o formulário numa faixa fixa: era o
+        contrário, então toda largura extra da tela ia para o campo de texto —
+        numa tela larga a roda continuava pequena ao lado de um textarea
+        gigante. A roda é o que se olha; o campo se resolve em 18rem, e ganha
+        um pouco mais só quando há folga (xl).
+      */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card className="flex flex-col items-center gap-5 p-6">
           <Roleta
             temas={temasNaRoda}

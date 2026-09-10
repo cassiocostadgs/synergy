@@ -127,7 +127,7 @@ export function MovingMotivatorsCard() {
   }
 
   return (
-    <Card className="max-w-2xl p-6 sm:p-8">
+    <Card className="p-6 sm:p-8">
       <div className="mb-5">
         <h2 className="font-display text-lg font-bold text-content">O que te move no trabalho?</h2>
         <p className="mt-1 text-sm text-content-muted">
@@ -174,7 +174,12 @@ export function MovingMotivatorsCard() {
                     >
                       {indice + 1}º
                     </span>
-                    <p className="truncate text-sm text-content-muted">
+                    {/* Uma linha por item mantém os 10 visíveis sem rolagem; o
+                        title devolve a descrição inteira quando ela é cortada. */}
+                    <p
+                      title={`${info.nome}: ${info.desc}`}
+                      className="truncate text-sm text-content-muted"
+                    >
                       <strong className="text-content">{info.nome}:</strong> {info.desc}
                     </p>
                   </div>

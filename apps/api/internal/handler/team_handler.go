@@ -70,7 +70,7 @@ func (h *TeamHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respond(w, http.StatusOK, toTeamResponses(teams))
+	respond(w, http.StatusOK, toTeamsComPapelResponse(teams))
 }
 
 // Get — GET /api/v1/teams/{teamId}

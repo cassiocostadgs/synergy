@@ -39,6 +39,11 @@ export interface Team {
   id: string
   name: string
   status: TeamStatus
+  /**
+   * Papel de quem fez a requisição neste time. Ausente quando não é membro —
+   * possível para o Admin, que enxerga todos os times.
+   */
+  myRole?: TeamRole
   createdAt: string
 }
 

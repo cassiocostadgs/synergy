@@ -34,9 +34,15 @@ const FAIXA_LEGENDA: Array<{ faixa: FaixaDePrioridade; rotulo: string }> = [
 export function MapaDeCalor({
   membros,
   scores,
+  totalDeMembros,
+  filtrado,
 }: {
   membros: RadarMember[]
   scores: MotivatorScore[]
+  /** Quantos colaboradores o time tem, antes do filtro. */
+  totalDeMembros: number
+  /** true quando um colaborador específico está selecionado. */
+  filtrado: boolean
 }) {
   const colunas: Motivator[] = scores.map((item) => item.motivator)
 
@@ -45,6 +51,11 @@ export function MapaDeCalor({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-base font-bold text-content">
           Mapa de calor individual
+          {filtrado ? (
+            <span className="ml-2 text-xs font-normal text-content-muted">
+              {membros.length} de {totalDeMembros}
+            </span>
+          ) : null}
         </h2>
         <div className="flex flex-wrap items-center gap-3">
           {FAIXA_LEGENDA.map(({ faixa, rotulo }) => (
@@ -138,6 +149,9 @@ export function MapaDeCalor({
       <p className="mt-2.5 text-[11px] text-content-muted">
         Colunas ordenadas pela força no time. Linha tracejada indica quem ainda não respondeu; o
         ícone ao lado do nome marca revisão vencida.
+        {filtrado
+          ? ' O polígono do time no gráfico continua o mesmo — o filtro acrescenta a linha da pessoa por cima.'
+          : ''}
       </p>
     </div>
   )
