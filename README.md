@@ -286,7 +286,7 @@ handler  →  usecase  →  domain  ←  repository
 ### Papéis
 
 `ADMIN`, `GESTOR` e `COLABORADOR` estão implementados. `AUDITOR` existe no enum, mas está
-**fora do escopo do MVP**: não recebe sessão nem regras de permissão.
+**fora do escopo do MVP**: não recebe sessão nem regras de permissão por enquanto.
 
 ---
 
