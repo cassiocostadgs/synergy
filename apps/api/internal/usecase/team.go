@@ -374,8 +374,11 @@ type MembroPendente struct {
 
 // MembroDoRadar é a linha de uma pessoa no mapa de calor individual.
 type MembroDoRadar struct {
-	UserID      uuid.UUID
-	Nome        string
+	UserID uuid.UUID
+	Nome   string
+	// NomeDoTime só vem preenchido na visão consolidada, em que a mesma tabela
+	// mistura gente de times diferentes e a coluna passa a fazer falta.
+	NomeDoTime  string
 	PapelNoTime domain.TeamRole
 	Respondeu   bool
 	// Posicoes traz a colocação (1 a 10) que a pessoa deu a cada motivador.
@@ -403,7 +406,7 @@ type MotivatorsDoTime struct {
 	Pendentes []MembroPendente
 }
 
-// MotivatorsOverview monta o Radar do time.
+// MotivatorsOverview monta o Radar de UM time.
 //
 // Devolve o placar agregado E as respostas individuais de cada membro, que
 // alimentam o mapa de calor da tela.
@@ -443,6 +446,170 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		membros = append(membros, membro)
 	}
 
+	radar, err := uc.radarDeMembros(ctx, membros, nil, agora)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MotivatorsDoTime{
+		Time:         team,
+		TotalMembros: len(membros),
+		Responderam:  len(radar.respondidos),
+		Placar:       domain.AgregarMotivators(radar.respondidos),
+		Membros:      radar.linhas,
+		Pendentes:    radar.pendentes,
+	}, nil
+}
+
+// MotivatorsConsolidado é o Radar de VÁRIOS times somados (PRD seção 3.2.4).
+type MotivatorsConsolidado struct {
+	// Times que entraram na conta, na ordem em que foram somados.
+	Times        []domain.Team
+	TotalMembros int
+	Responderam  int
+	Placar       []domain.MotivatorTeamScore
+	Membros      []MembroDoRadar
+	Pendentes    []MembroPendente
+}
+
+// MotivatorsOverviewGeral consolida o Radar de todos os times que o ator gere
+// (todos os ativos, no caso do Admin).
+//
+// Duas regras dão sentido ao número consolidado:
+//
+//   - **Cada pessoa conta uma vez.** Quem participa de dois times entraria duas
+//     vezes na média e pesaria o dobro de um colega — o placar deixaria de
+//     descrever o conjunto de pessoas para descrever o conjunto de vínculos.
+//   - **Quem gere QUALQUER um dos times fica de fora**, mesmo sendo colaborador
+//     em outro. É a mesma separação entre quem observa e quem é observado da
+//     visão por time; aqui ela precisa valer no conjunto, senão o gestor de um
+//     time reapareceria pela porta do outro.
+func (uc *TeamUseCase) MotivatorsOverviewGeral(
+	ctx context.Context,
+	actor domain.Actor,
+	agora time.Time,
+) (*MotivatorsConsolidado, error) {
+	times, err := uc.timesQueGere(ctx, actor)
+	if err != nil {
+		return nil, err
+	}
+
+	// Uma consulta de membros por time. São poucos times por gestor, e um IN
+	// único economizaria uma ida ao banco ao custo de um método de repositório
+	// que só esta tela usaria.
+	porTime := make([][]domain.TeamMemberView, 0, len(times))
+	gestores := map[uuid.UUID]bool{}
+	for _, time := range times {
+		membros, err := uc.members.ListByTeam(ctx, time.ID)
+		if err != nil {
+			return nil, err
+		}
+		porTime = append(porTime, membros)
+		for _, membro := range membros {
+			if membro.Role.IsManager() {
+				gestores[membro.UserID] = true
+			}
+		}
+	}
+
+	nomeDoTime := make(map[uuid.UUID]string, len(times))
+	for _, time := range times {
+		nomeDoTime[time.ID] = time.Name
+	}
+
+	vistos := map[uuid.UUID]bool{}
+	membros := []domain.TeamMemberView{}
+	for _, doTime := range porTime {
+		for _, membro := range doTime {
+			if membro.Role.IsManager() || gestores[membro.UserID] || vistos[membro.UserID] {
+				continue
+			}
+			vistos[membro.UserID] = true
+			membros = append(membros, membro)
+		}
+	}
+
+	radar, err := uc.radarDeMembros(ctx, membros, nomeDoTime, agora)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MotivatorsConsolidado{
+		Times:        times,
+		TotalMembros: len(membros),
+		Responderam:  len(radar.respondidos),
+		Placar:       domain.AgregarMotivators(radar.respondidos),
+		Membros:      radar.linhas,
+		Pendentes:    radar.pendentes,
+	}, nil
+}
+
+// timesQueGere devolve os times ativos sob responsabilidade do ator.
+//
+// Admin enxerga todos os ativos, como já acontece na listagem de times.
+func (uc *TeamUseCase) timesQueGere(
+	ctx context.Context,
+	actor domain.Actor,
+) ([]domain.Team, error) {
+	if !actor.IsAdmin() && actor.Role != domain.RoleGestor {
+		return nil, domain.Forbidden("você não tem acesso ao Radar")
+	}
+
+	if actor.IsAdmin() {
+		todos, err := uc.teams.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return apenasAtivos(todos), nil
+	}
+
+	doUsuario, err := uc.teams.ListByUser(ctx, actor.UserID)
+	if err != nil {
+		return nil, err
+	}
+	papeis, err := uc.members.ListRolesByUser(ctx, actor.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	geridos := make([]domain.Team, 0, len(doUsuario))
+	for _, time := range apenasAtivos(doUsuario) {
+		// Participar não basta: o Radar é de quem gere (RN2).
+		if papeis[time.ID].IsManager() {
+			geridos = append(geridos, time)
+		}
+	}
+	return geridos, nil
+}
+
+func apenasAtivos(times []domain.Team) []domain.Team {
+	ativos := make([]domain.Team, 0, len(times))
+	for _, time := range times {
+		if !time.IsArchived() {
+			ativos = append(ativos, time)
+		}
+	}
+	return ativos
+}
+
+// dadosDoRadar são as três listas que as duas visões do Radar produzem.
+type dadosDoRadar struct {
+	linhas      []MembroDoRadar
+	pendentes   []MembroPendente
+	respondidos []domain.MotivatorRanking
+}
+
+// radarDeMembros converte um conjunto de membros JÁ FILTRADO nas listas do
+// Radar. Vive separado porque a visão de um time e a consolidada divergem só na
+// escolha de quem entra — daí para frente, a conta é a mesma.
+//
+// nomeDoTime pode ser nil: na visão de um time só, a coluna de time não existe.
+func (uc *TeamUseCase) radarDeMembros(
+	ctx context.Context,
+	membros []domain.TeamMemberView,
+	nomeDoTime map[uuid.UUID]string,
+	agora time.Time,
+) (*dadosDoRadar, error) {
 	ids := make([]uuid.UUID, 0, len(membros))
 	for _, membro := range membros {
 		ids = append(ids, membro.UserID)
@@ -453,30 +620,33 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		return nil, err
 	}
 
-	respondidos := make([]domain.MotivatorRanking, 0, len(rankings))
-	pendentes := make([]MembroPendente, 0, len(membros))
-	linhas := make([]MembroDoRadar, 0, len(membros))
+	dados := &dadosDoRadar{
+		linhas:      make([]MembroDoRadar, 0, len(membros)),
+		pendentes:   make([]MembroPendente, 0, len(membros)),
+		respondidos: make([]domain.MotivatorRanking, 0, len(membros)),
+	}
 
 	for _, membro := range membros {
 		linha := MembroDoRadar{
 			UserID:      membro.UserID,
 			Nome:        membro.UserName,
+			NomeDoTime:  nomeDoTime[membro.TeamID],
 			PapelNoTime: membro.Role,
 		}
 
 		ranking, respondeu := rankings[membro.UserID]
 		if !respondeu || !ranking.Preenchido() {
-			pendentes = append(pendentes, MembroPendente{
+			dados.pendentes = append(dados.pendentes, MembroPendente{
 				UserID: membro.UserID,
 				Nome:   membro.UserName,
 			})
 			// Entra no mapa de calor mesmo sem resposta: a linha vazia mostra
 			// quem falta sem precisar cruzar com outra lista.
-			linhas = append(linhas, linha)
+			dados.linhas = append(dados.linhas, linha)
 			continue
 		}
 
-		respondidos = append(respondidos, *ranking)
+		dados.respondidos = append(dados.respondidos, *ranking)
 
 		posicoes := make(map[domain.Motivator]int, len(ranking.Ordem))
 		for indice, motivador := range ranking.Ordem {
@@ -488,10 +658,10 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		linha.Posicoes = posicoes
 		linha.DiasDesdeResposta = dias
 		linha.PrecisaRevisar = ranking.PrecisaRevisar(agora)
-		linhas = append(linhas, linha)
+		dados.linhas = append(dados.linhas, linha)
 
 		if linha.PrecisaRevisar {
-			pendentes = append(pendentes, MembroPendente{
+			dados.pendentes = append(dados.pendentes, MembroPendente{
 				UserID:            membro.UserID,
 				Nome:              membro.UserName,
 				Respondeu:         true,
@@ -500,14 +670,7 @@ func (uc *TeamUseCase) MotivatorsOverview(
 		}
 	}
 
-	return &MotivatorsDoTime{
-		Time:         team,
-		TotalMembros: len(membros),
-		Responderam:  len(respondidos),
-		Placar:       domain.AgregarMotivators(respondidos),
-		Membros:      linhas,
-		Pendentes:    pendentes,
-	}, nil
+	return dados, nil
 }
 
 // --- helpers ---

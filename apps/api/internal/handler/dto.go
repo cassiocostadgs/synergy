@@ -153,8 +153,10 @@ type pendingMemberResponse struct {
 
 // radarMemberResponse é a linha de uma pessoa no mapa de calor individual.
 type radarMemberResponse struct {
-	UserID   string `json:"userId"`
-	Name     string `json:"name"`
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	// TeamName só aparece na visão consolidada, onde a tabela mistura times.
+	TeamName string `json:"teamName,omitempty"`
 	TeamRole string `json:"teamRole"`
 	Answered bool   `json:"answered"`
 	// Positions mapeia motivador -> colocação (1 a 10). Vazio se não respondeu.
@@ -165,6 +167,18 @@ type radarMemberResponse struct {
 
 type teamMotivatorsResponse struct {
 	Team             teamResponse             `json:"team"`
+	MembersTotal     int                      `json:"membersTotal"`
+	MembersAnswered  int                      `json:"membersAnswered"`
+	ReviewPeriodDays int                      `json:"reviewPeriodDays"`
+	Scores           []motivatorScoreResponse `json:"scores"`
+	Members          []radarMemberResponse    `json:"members"`
+	Pending          []pendingMemberResponse  `json:"pending"`
+}
+
+// consolidatedMotivatorsResponse é o Radar de vários times somados. Difere do
+// anterior apenas no cabeçalho: `teams` no lugar de `team`.
+type consolidatedMotivatorsResponse struct {
+	Teams            []teamResponse           `json:"teams"`
 	MembersTotal     int                      `json:"membersTotal"`
 	MembersAnswered  int                      `json:"membersAnswered"`
 	ReviewPeriodDays int                      `json:"reviewPeriodDays"`
@@ -237,8 +251,42 @@ func toMotivatorRankingResponse(
 }
 
 func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsResponse {
-	scores := make([]motivatorScoreResponse, 0, len(visao.Placar))
-	for _, item := range visao.Placar {
+	return teamMotivatorsResponse{
+		Team:             toTeamResponse(visao.Time),
+		MembersTotal:     visao.TotalMembros,
+		MembersAnswered:  visao.Responderam,
+		ReviewPeriodDays: domain.PeriodoRevisaoDias,
+		Scores:           toMotivatorScores(visao.Placar),
+		Members:          toRadarMembers(visao.Membros),
+		Pending:          toPendingMembers(visao.Pendentes),
+	}
+}
+
+func toConsolidatedMotivatorsResponse(
+	visao *usecase.MotivatorsConsolidado,
+) consolidatedMotivatorsResponse {
+	times := make([]teamResponse, 0, len(visao.Times))
+	for i := range visao.Times {
+		times = append(times, toTeamResponse(&visao.Times[i]))
+	}
+
+	return consolidatedMotivatorsResponse{
+		Teams:            times,
+		MembersTotal:     visao.TotalMembros,
+		MembersAnswered:  visao.Responderam,
+		ReviewPeriodDays: domain.PeriodoRevisaoDias,
+		Scores:           toMotivatorScores(visao.Placar),
+		Members:          toRadarMembers(visao.Membros),
+		Pending:          toPendingMembers(visao.Pendentes),
+	}
+}
+
+// As três conversões abaixo são compartilhadas pelas duas visões do Radar: o
+// que muda entre elas é só o cabeçalho (um time ou vários).
+
+func toMotivatorScores(placar []domain.MotivatorTeamScore) []motivatorScoreResponse {
+	scores := make([]motivatorScoreResponse, 0, len(placar))
+	for _, item := range placar {
 		scores = append(scores, motivatorScoreResponse{
 			Motivator:       string(item.Motivator),
 			Score:           item.Score,
@@ -246,9 +294,12 @@ func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsRes
 			TopCount:        item.TopCount,
 		})
 	}
+	return scores
+}
 
-	pendentes := make([]pendingMemberResponse, 0, len(visao.Pendentes))
-	for _, membro := range visao.Pendentes {
+func toPendingMembers(lista []usecase.MembroPendente) []pendingMemberResponse {
+	pendentes := make([]pendingMemberResponse, 0, len(lista))
+	for _, membro := range lista {
 		pendentes = append(pendentes, pendingMemberResponse{
 			UserID:          membro.UserID.String(),
 			Name:            membro.Nome,
@@ -256,12 +307,16 @@ func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsRes
 			DaysSinceAnswer: membro.DiasDesdeResposta,
 		})
 	}
+	return pendentes
+}
 
-	membros := make([]radarMemberResponse, 0, len(visao.Membros))
-	for _, linha := range visao.Membros {
+func toRadarMembers(lista []usecase.MembroDoRadar) []radarMemberResponse {
+	membros := make([]radarMemberResponse, 0, len(lista))
+	for _, linha := range lista {
 		item := radarMemberResponse{
 			UserID:          linha.UserID.String(),
 			Name:            linha.Nome,
+			TeamName:        linha.NomeDoTime,
 			TeamRole:        string(linha.PapelNoTime),
 			Answered:        linha.Respondeu,
 			DaysSinceAnswer: linha.DiasDesdeResposta,
@@ -276,16 +331,7 @@ func toTeamMotivatorsResponse(visao *usecase.MotivatorsDoTime) teamMotivatorsRes
 		}
 		membros = append(membros, item)
 	}
-
-	return teamMotivatorsResponse{
-		Team:             toTeamResponse(visao.Time),
-		MembersTotal:     visao.TotalMembros,
-		MembersAnswered:  visao.Responderam,
-		ReviewPeriodDays: domain.PeriodoRevisaoDias,
-		Scores:           scores,
-		Members:          membros,
-		Pending:          pendentes,
-	}
+	return membros
 }
 
 func toTeamResponse(team *domain.Team) teamResponse {

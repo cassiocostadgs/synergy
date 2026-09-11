@@ -150,6 +150,26 @@ func (h *TeamHandler) Motivators(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, toTeamMotivatorsResponse(visao))
 }
 
+// MotivatorsGeral — GET /api/v1/teams/motivators
+//
+// Radar consolidado de todos os times que a pessoa gere (todos os ativos, no
+// caso do Admin). Cada pessoa conta uma vez, mesmo participando de dois times.
+func (h *TeamHandler) MotivatorsGeral(w http.ResponseWriter, r *http.Request) {
+	actor, err := requireActor(r)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	visao, err := h.teams.MotivatorsOverviewGeral(r.Context(), actor, time.Now().UTC())
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	respond(w, http.StatusOK, toConsolidatedMotivatorsResponse(visao))
+}
+
 // ListMembers — GET /api/v1/teams/{teamId}/members
 func (h *TeamHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	actor, teamID, err := h.actorAndTeam(r)

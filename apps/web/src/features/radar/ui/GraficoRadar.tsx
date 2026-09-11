@@ -1,3 +1,4 @@
+import { cx } from '@/components/ui'
 import { MOTIVATOR_INFO } from '@/features/motivators/motivators'
 import type { MotivatorScore } from '@/features/radar/api/radarApi'
 
@@ -55,9 +56,16 @@ export interface SerieIndividual {
 export function GraficoRadar({
   scores,
   individual,
+  className,
 }: {
   scores: MotivatorScore[]
   individual?: SerieIndividual
+  /**
+   * Quem decide o tamanho é a página. Com `max-h-full` dentro de uma caixa de
+   * altura conhecida, o SVG encolhe mantendo a proporção e continua centrado,
+   * porque é um elemento substituído com razão intrínseca — nada é cortado.
+   */
+  className?: string
 }) {
   const total = scores.length
   if (total === 0) return null
@@ -79,7 +87,7 @@ export function GraficoRadar({
   return (
     <svg
       viewBox={`0 0 ${LARGURA} ${ALTURA}`}
-      className="w-full"
+      className={cx('w-full', className)}
       role="img"
       aria-label={
         verticesIndividuais

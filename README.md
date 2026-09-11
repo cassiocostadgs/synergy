@@ -1,7 +1,8 @@
 # Synergy — MVP
 
 Hub de engajamento e gestão para times remotos. Este repositório é um monorepo com o
-backend em Go (`apps/api`) e o frontend em React (`apps/web`).
+backend em Go (`apps/api`), o frontend em React (`apps/web`) e os testes de ponta a ponta
+em Playwright (`apps/e2e`).
 
 ## O que está entregue
 
@@ -261,6 +262,25 @@ passo manual de banco. Rode `./cmd/seed` uma única vez, para criar o Admin inic
 
 ---
 
+## 6. Testes
+
+| Camada | Onde | Comando | O que cobre |
+| :--- | :--- | :--- | :--- |
+| Unitários (Go) | `apps/api` | `.\scripts\test.ps1` | regras de negócio: RN1/RN2, papéis, Borda, validação do token do Entra |
+| Ponta a ponta | `apps/e2e` | `npm test` | produto montado: API + front + PostgreSQL rodando de verdade |
+
+```bash
+cd apps/e2e
+npm install     # só na primeira vez
+npm test        # sobe API e front se não estiverem no ar
+```
+
+A suíte padrão do `apps/e2e` **não altera o banco** — pode rodar com o app aberto na tela.
+Os testes que criam registro ficam num projeto separado e opt-in (`npm run test:residuo`),
+porque a API não tem `DELETE` de time. Detalhes em `apps/e2e/README.md`.
+
+---
+
 ## Arquitetura
 
 ### Backend — camadas (dependências sempre para dentro)
@@ -313,6 +333,7 @@ handler  →  usecase  →  domain  ←  repository
 | GET | `/api/v1/teams/{teamId}` | membros do time / Admin |
 | PATCH | `/api/v1/teams/{teamId}` | Gestores do time / Admin |
 | POST | `/api/v1/teams/{teamId}/archive` | Gestores do time / Admin |
+| GET | `/api/v1/teams/motivators` | Admin, Gestor — Radar consolidado dos times que a pessoa gere |
 | GET | `/api/v1/teams/{teamId}/motivators` | Gestores do time / Admin — Radar agregado |
 | GET | `/api/v1/teams/{teamId}/members` | membros do time / Admin |
 | POST | `/api/v1/teams/{teamId}/members` | Gestores do time / Admin |

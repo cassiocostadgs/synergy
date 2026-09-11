@@ -13,7 +13,7 @@ import {
 } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { MOTIVATOR_INFO } from '@/features/motivators/motivators'
-import { radarApi, type MotivatorScore, type TeamMotivators } from '@/features/radar/api/radarApi'
+import { radarApi, type MotivatorScore, type RadarBase } from '@/features/radar/api/radarApi'
 import { GraficoRadar } from '@/features/radar/ui/GraficoRadar'
 import { MapaDeCalor } from '@/features/radar/ui/MapaDeCalor'
 import { useTeams } from '@/features/teams/hooks/useTeams'
@@ -22,6 +22,13 @@ import { isTeamManager, type Team } from '@/types'
 
 /** Quantas posições ganham cartão de destaque ao lado do gráfico. */
 const DESTAQUES = 3
+
+/**
+ * Valor do seletor que representa "todos os meus times somados".
+ *
+ * Não é um id de time, e por isso precisa ser um valor que nenhum UUID assume.
+ */
+const TODOS_OS_TIMES = 'consolidado'
 
 /**
  * Radar: visão agregada dos Moving Motivators de um time (PRD seção 3.2.4).
@@ -59,8 +66,21 @@ export function RadarPage() {
     if (!teamId && ativos.length > 0) setTeamId(ativos[0].id)
   }, [teamId, ativos])
 
-  const buscar = useCallback(() => radarApi.team(teamId), [teamId])
-  const { data, loading, error } = useResource<TeamMotivators>(buscar, teamId !== '')
+  const consolidado = teamId === TODOS_OS_TIMES
+
+  const buscar = useCallback(
+    () => (consolidado ? radarApi.consolidado() : radarApi.team(teamId)),
+    [consolidado, teamId],
+  )
+  const { data, loading, error } = useResource<RadarBase>(buscar, teamId !== '')
+
+  /*
+   * Nome do escopo, para os textos da tela. Na visão consolidada não há "o
+   * time": são vários, e dizer "adicione pessoas ao <time>" não faria sentido.
+   */
+  const escopo = consolidado
+    ? `seus ${ativos.length} times`
+    : (ativos.find((team) => team.id === teamId)?.name ?? 'time')
 
   const colaboradores = [...(data?.members ?? [])].sort((a, b) => a.name.localeCompare(b.name))
   /*
@@ -71,20 +91,56 @@ export function RadarPage() {
   const selecionado = colaboradores.some((m) => m.userId === colaboradorId) ? colaboradorId : ''
 
   return (
-    <>
+    /*
+      A tela inteira é uma coluna de altura de viewport, para não rolar. O que
+      se desconta é o que fica FORA dela, e esse valor muda com o breakpoint:
+
+        md  → 11rem: cabeçalho do app (4rem) + respiros do main (1rem em cima,
+              6rem embaixo, reservados para a barra de navegação flutuante).
+        lg  →  8rem: a barra flutuante dá lugar à lateral, e o respiro de baixo
+              cai para 2.5rem.
+
+      O título NÃO entra nesse cálculo de propósito: com os dois filtros ao
+      lado, ele ocupa uma linha em telas largas e duas em telas estreitas, e
+      subtrair um valor fixo erraria em uma das duas. Sendo item da coluna, a
+      altura real dele é descontada sozinha.
+
+      A altura é definida (`h`), não um mínimo: é o que dá ao flex espaço para
+      distribuir, fazendo o gráfico encolher e o mapa de calor esticar. Com
+      `min-h` não existe "sobra" a repartir — o conteúdo manda, o gráfico fica
+      no tamanho natural e a página rola.
+
+      `min-h-fit` é a válvula de escape: quando nem no piso de altura o gráfico
+      couber, a coluna cresce além da tela e a página rola, em vez de o
+      conteúdo vazar para fora dos cartões. Rolar é aceitável; layout quebrado,
+      não.
+    */
+    <div className="md:flex md:h-[calc(100svh_-_11rem)] md:min-h-fit md:flex-col lg:h-[calc(100svh_-_8rem)]">
       <PageHeader
         title="Radar"
-        subtitle="O que move os colaboradores do time, a partir das respostas de Moving Motivators"
+        // Curto de propósito: com os dois filtros ao lado, um subtítulo longo
+        // quebra o cabeçalho em duas linhas a partir de 1280px e come 76px de
+        // altura — justamente o que falta para o gráfico caber.
+        subtitle="O que move os colaboradores, pelas respostas de Moving Motivators"
+        // Aqui o subtítulo é explicação, não estado: pode sumir quando a altura
+        // da janela é o recurso escasso.
+        subtitleOptional
         actions={
           ativos.length > 0 ? (
             <div className="flex flex-wrap items-end gap-3">
               {ativos.length > 1 ? (
-                <div className="min-w-48">
+                <div className="min-w-56">
                   <Select
                     label="Time"
                     value={teamId}
                     onChange={(event) => setTeamId(event.target.value)}
                   >
+                    {/*
+                      Primeiro da lista porque é a leitura mais ampla — quem
+                      gere vários times costuma querer o conjunto antes do
+                      recorte. A soma é feita no servidor.
+                    */}
+                    <option value={TODOS_OS_TIMES}>Todos os meus times ({ativos.length})</option>
                     {ativos.map((team: Team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
@@ -141,17 +197,32 @@ export function RadarPage() {
         </Card>
       ) : null}
 
-      {data ? <ConteudoDoRadar data={data} colaboradorId={selecionado} /> : null}
-    </>
+      {data ? (
+        <ConteudoDoRadar
+          data={data}
+          colaboradorId={selecionado}
+          escopo={escopo}
+          consolidado={consolidado}
+          className="md:min-h-0 md:flex-1"
+        />
+      ) : null}
+    </div>
   )
 }
 
 function ConteudoDoRadar({
   data,
   colaboradorId,
+  escopo,
+  consolidado,
+  className,
 }: {
-  data: TeamMotivators
+  data: RadarBase
   colaboradorId: string
+  /** Nome do time, ou "seus N times" na visão consolidada. */
+  escopo: string
+  consolidado: boolean
+  className?: string
 }) {
   const cobertura =
     data.membersTotal > 0 ? Math.round((data.membersAnswered / data.membersTotal) * 100) : 0
@@ -164,8 +235,8 @@ function ConteudoDoRadar({
       <Card>
         <EmptyState
           icon="person_add"
-          title="Este time ainda não tem colaboradores"
-          description={`O Radar retrata os colaboradores do time — quem exerce papel de gestão fica fora. Adicione pessoas ao ${data.team.name} pelo painel de membros.`}
+          title={consolidado ? 'Nenhum colaborador nos seus times' : 'Este time ainda não tem colaboradores'}
+          description={`O Radar retrata os colaboradores — quem exerce papel de gestão fica fora. Adicione pessoas a ${escopo} pelo painel de membros.`}
         />
       </Card>
     )
@@ -177,7 +248,7 @@ function ConteudoDoRadar({
         <EmptyState
           icon="radar"
           title="Nenhum colaborador respondeu ainda"
-          description={`O radar aparece quando ao menos um colaborador do ${data.team.name} preencher os motivadores no próprio perfil.`}
+          description={`O radar aparece quando ao menos um colaborador de ${escopo} preencher os motivadores no próprio perfil.`}
         />
       </Card>
     )
@@ -212,8 +283,43 @@ function ConteudoDoRadar({
     selecionadoNaLista && !selecionadoNaLista.answered ? selecionadoNaLista.name : null
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+    /*
+      Coluna interna: os KPIs e a faixa de pendências ficam do tamanho que são,
+      e o que sobra da altura vai para a linha do gráfico e da matriz. É o que
+      dispensa adivinhar se a faixa de pendências existe — ela só aparece quando
+      há alguém pendente.
+    */
+    <div className={cx('space-y-4 md:flex md:flex-col', className)}>
+      {/*
+        Em janela baixa os três cartões de KPI custam 113px — mais de um quarto
+        da altura útil de um notebook 1280x800 com escala de 150%, onde a
+        viewport tem ~440px. Abaixo desse limiar eles viram uma linha de texto
+        com os mesmos três números: some o enfeite, não a informação.
+      */}
+      <p className="hidden shrink-0 flex-wrap items-center gap-x-3 text-xs text-content-muted [@media(max-height:760px)]:flex">
+        <span>
+          <strong className="text-content">
+            {data.membersAnswered}/{data.membersTotal}
+          </strong>{' '}
+          responderam ({cobertura}%)
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          Move mais:{' '}
+          <strong className="text-secondary">
+            {MOTIVATOR_INFO[data.scores[0].motivator].nome}
+          </strong>
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          <strong className={revisaoVencida.length > 0 ? 'text-warning' : 'text-content'}>
+            {revisaoVencida.length}
+          </strong>{' '}
+          {revisaoVencida.length === 1 ? 'revisão vencida' : 'revisões vencidas'}
+        </span>
+      </p>
+
+      <div className="grid shrink-0 gap-3 sm:grid-cols-3 [@media(max-height:760px)]:hidden">
         <KpiCard
           compact
           label="Responderam"
@@ -223,7 +329,7 @@ function ConteudoDoRadar({
         />
         <KpiCard
           compact
-          label="Move mais o time"
+          label={consolidado ? 'Move mais o conjunto' : 'Move mais o time'}
           value={MOTIVATOR_INFO[data.scores[0].motivator].nome}
           hint={`${data.scores[0].topCount} de ${data.membersAnswered} colocaram no top 3`}
           accent="secondary"
@@ -240,11 +346,41 @@ function ConteudoDoRadar({
 
       {/*
         Duas colunas de metade cada: gráfico com os destaques à esquerda, mapa
-        de calor à direita. Empilhar os dois faria a página rolar.
+        de calor à direita.
+
+        Esta linha fica com a altura que sobra da coluna: o gráfico se ajusta a
+        ela e o mapa de calor rola por dentro, em vez de esticar a página.
       */}
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="p-4">
-          <GraficoRadar scores={data.scores} individual={serieIndividual} />
+      {/*
+        `flex-1` sem `min-h-0`: a linha cresce com a sobra, mas não encolhe
+        abaixo do que os cartões precisam. Com `min-h-0` ela cedia e os cartões
+        passavam por cima da faixa de pendências numa janela baixa.
+      */}
+      <div className="grid gap-3 md:flex-1 md:grid-cols-2">
+        {/*
+          Sem `min-h-0` de propósito, ao contrário do cartão ao lado: o mapa de
+          calor PODE encolher abaixo do conteúdo, porque rola por dentro; o
+          gráfico não pode — autorizar isso era o que fazia o SVG vazar para
+          fora do cartão numa janela baixa.
+        */}
+        <Card className="flex flex-col justify-center p-4">
+          {/*
+            O gráfico se ajusta ao espaço do cartão, não a uma conta de
+            viewport: `flex-1` faz ele ocupar a sobra, e o piso de 10rem impede
+            que o flex o esprema — sem o piso ele cedia espaço para os destaques
+            e chegava a 75px de altura, praticamente sumindo.
+
+            Medir por viewport era frágil porque o respiro inferior do `main`
+            muda com o breakpoint (96px quando a barra flutuante existe, 40px
+            quando a lateral aparece): a mesma conta errava em um dos dois.
+          */}
+          <div className="flex min-h-40 flex-1 items-center justify-center">
+            <GraficoRadar
+              scores={data.scores}
+              individual={serieIndividual}
+              className="max-h-full"
+            />
+          </div>
 
           {/* Legenda só faz sentido quando há duas séries no gráfico. */}
           {serieIndividual ? (
@@ -268,7 +404,12 @@ function ConteudoDoRadar({
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          {/*
+            Os três destaques repetem o que o gráfico já mostra em rosa e o que
+            a linha de KPIs diz em texto. Em janela baixa eles são os primeiros
+            a sair: valem 72px que fazem falta ao gráfico e à matriz.
+          */}
+          <div className="mt-3 grid grid-cols-3 gap-2 [@media(max-height:760px)]:hidden">
             {destaques.map((item, indice) => (
               <CartaoDeDestaque
                 key={item.motivator}
@@ -280,7 +421,7 @@ function ConteudoDoRadar({
           </div>
         </Card>
 
-        <Card className="overflow-hidden">
+        <Card className="flex min-h-0 flex-col overflow-hidden">
           {/*
             O filtro por nome recorta as linhas do mapa e acrescenta a série da
             pessoa ao gráfico. O que é do time — polígono, destaques e
@@ -293,13 +434,18 @@ function ConteudoDoRadar({
             scores={data.scores}
             totalDeMembros={data.members.length}
             filtrado={colaboradorId !== ''}
+            mostrarTime={consolidado}
           />
         </Card>
       </div>
 
-      {/* Faixa fina em vez de cartão com título: economiza altura. */}
+      {/*
+        Faixa fina em vez de cartão com título: economiza altura. O teto de
+        altura com rolagem própria impede que uma lista grande de pendentes
+        empurre o resto da tela para fora.
+      */}
       {data.pending.length > 0 ? (
-        <Card className="flex flex-wrap items-center gap-2 p-3.5">
+        <Card className="flex max-h-24 shrink-0 flex-wrap items-center gap-2 overflow-y-auto p-3.5">
           <span className="text-[11px] font-semibold tracking-[0.16em] text-content-muted uppercase">
             Atenção
           </span>

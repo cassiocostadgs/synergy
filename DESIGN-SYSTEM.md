@@ -83,7 +83,19 @@ e a **BottomNavBar** flutuante quando a lateral fica oculta (abaixo de `lg`).
 - **Ajuste à altura da janela (sem rolagem):** como a roda é quadrada, o teto de **largura** também controla a altura — `min(28rem, 100svh - 26rem)`, onde `28rem` evita o disco de tela cheia em monitor largo e a parte em `svh` desconta o que o app gasta em volta (cabeçalho, respiros do `main`, título da página, botão e área do resultado). O campo de temas tem teto equivalente. **Padrão da casa:** dar o teto em `svh` a cada cartão, em vez de altura fixa na linha do grid — altura fixa estica os cartões e cria espaço morto quando o conteúdo para de crescer. Abaixo de ~620px de altura útil a rolagem volta, por um piso de `12rem`: roda ilegível é pior que rolagem.
 - **Regra de implementação:** o vencedor é sorteado **antes** da animação e a roda gira até ele. Nunca derive o vencedor do ângulo final.
 
-### 4.4. Tela de Login
+### 4.4. Telas que cabem na janela (sem rolagem)
+
+Padrão usado no Radar, aplicável a qualquer tela densa.
+
+- **Coluna de altura de viewport:** a tela é uma coluna flex com `h-[calc(100svh - Xrem)]`, onde `X` é só o que fica **fora** dela. Esse valor **muda com o breakpoint**: em `md` o `main` reserva 6rem embaixo para a BottomNavBar flutuante; em `lg` a lateral toma o lugar dela e a reserva cai para 2.5rem. Um valor único erra em um dos dois.
+- **O que tem altura variável não entra na conta.** Título, KPIs e faixas de aviso são itens da coluna e descontam a altura real deles — subtrair um valor fixo exigiria adivinhar se o cabeçalho quebrou em duas linhas ou se a faixa existe.
+- **`min-h-fit` como válvula:** quando nem no tamanho mínimo o conteúdo couber, a coluna cresce e a página rola. Rolar é aceitável; conteúdo vazando para fora do cartão, não.
+- **`min-h-0` só em quem rola por dentro.** É ele que autoriza um item flex a encolher abaixo do próprio conteúdo. No cartão que tem rolagem interna (uma tabela), é o que faz a rolagem funcionar; em qualquer outro, é o que faz o conteúdo vazar.
+- **Gráfico se ajusta ao container, não ao viewport:** `flex-1` com piso de altura, dentro de um cartão de altura conhecida. Sendo SVG com razão intrínseca, ele encolhe inteiro e continua centrado. Conta por `svh` em elemento aninhado é frágil — ela ignora tudo que está entre o viewport e ele.
+- **Abaixo de 760px de altura, o enfeite sai:** cartões de KPI viram uma linha de texto com os mesmos números, notas explicativas e destaques redundantes somem, e os respiros encolhem. Num notebook 1280x800 com escala de 150% a viewport tem ~440px — três cartões de KPI custariam um quarto dela.
+- **Subtítulo só some se for explicação.** `PageHeader` tem `subtitleOptional` justamente porque em algumas telas ele carrega **estado** (em Brackets, "Disputa encerrada"). Esconder por altura o que não aparece em outro lugar é perder informação, não ganhar espaço.
+
+### 4.5. Tela de Login
 
 - **Cartão único** centralado (`max-w-sm`), com o logotipo na vertical e `shadow-glow-primary`.
 - **Ordem:** formulário de e-mail e senha primeiro, divisória com "ou", e então o botão do SSO. O caminho por senha vem antes por ser o que funciona em qualquer ambiente — o SSO depende de configuração.
@@ -92,7 +104,7 @@ e a **BottomNavBar** flutuante quando a lateral fica oculta (abaixo de `lg`).
 - **Erros separados:** a falha do login por senha aparece dentro do formulário; a do SSO, abaixo do botão do SSO. Cada mensagem fica junto do que falhou.
 - **O botão do SSO só existe se estiver configurado** (`VITE_MS_TENANT_ID` e `VITE_MS_CLIENT_ID`): sem isso, a tela é apenas o formulário.
 
-### 4.5. Tabelas de Gestão (RBAC / Usuários / Teams)
+### 4.6. Tabelas de Gestão (RBAC / Usuários / Teams)
 - **Cabeçalho de Tabela:** Texto em maiúsculo, espaçamento organizado.
 - **Linhas:** Efeito hover sutil (`hover:bg-surface-container-high`), avatares com iniciais coloridas (ex: crachás circulares rosa/ciano), badges de status (`Active`, `Admin`, `User`) e botões de ação compactos (Visualizar, Editar, Excluir).
 

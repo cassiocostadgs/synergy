@@ -749,3 +749,216 @@ func TestListMembers_ReturnsUserData(t *testing.T) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Radar consolidado — todos os times que a pessoa gere
+// ---------------------------------------------------------------------------
+
+func TestMotivatorsOverviewGeral_SomaOsTimesQueOGestorGere(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	ana := h.newUser("Ana", domain.RoleColaborador)
+	bruno := h.newUser("Bruno", domain.RoleColaborador)
+
+	primeiro := h.newTeam("Squad Neon", gestor)
+	segundo := h.newTeam("Squad Aurora", gestor)
+
+	_, err := h.teams.AddMember(context.Background(), gestor, primeiro.ID, ana.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+	_, err = h.teams.AddMember(context.Background(), gestor, segundo.ID, bruno.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	_, err = h.motivators.Save(context.Background(), ana, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), gestor, time.Now())
+	requireNoError(t, err)
+
+	if len(visao.Times) != 2 {
+		t.Errorf("esperava os 2 times na conta, obtive %d", len(visao.Times))
+	}
+	if visao.TotalMembros != 2 {
+		t.Errorf("esperava Ana e Bruno, obtive %d membros", visao.TotalMembros)
+	}
+	if visao.Responderam != 1 {
+		t.Errorf("esperava 1 resposta, obtive %d", visao.Responderam)
+	}
+}
+
+func TestMotivatorsOverviewGeral_CadaPessoaContaUmaVez(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	repetida := h.newUser("Ana", domain.RoleColaborador)
+
+	primeiro := h.newTeam("Squad Neon", gestor)
+	segundo := h.newTeam("Squad Aurora", gestor)
+
+	// A mesma pessoa nos dois times.
+	_, err := h.teams.AddMember(context.Background(), gestor, primeiro.ID, repetida.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+	_, err = h.teams.AddMember(context.Background(), gestor, segundo.ID, repetida.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	_, err = h.motivators.Save(context.Background(), repetida, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), gestor, time.Now())
+	requireNoError(t, err)
+
+	// Contar a mesma pessoa duas vezes faria a resposta dela pesar o dobro da
+	// de um colega, e o placar deixaria de descrever o conjunto de pessoas.
+	if visao.TotalMembros != 1 {
+		t.Errorf("esperava 1 pessoa, obtive %d", visao.TotalMembros)
+	}
+	if visao.Responderam != 1 {
+		t.Errorf("esperava 1 resposta, obtive %d", visao.Responderam)
+	}
+	if len(visao.Membros) != 1 {
+		t.Errorf("esperava 1 linha no mapa de calor, obtive %d", len(visao.Membros))
+	}
+}
+
+func TestMotivatorsOverviewGeral_QuemGereUmTimeFicaForaMesmoSendoColaboradorNoOutro(t *testing.T) {
+	h := newHarness(t)
+	carla := h.newUser("Carla", domain.RoleGestor)
+	diego := h.newUser("Diego", domain.RoleGestor)
+
+	daCarla := h.newTeam("Squad Neon", carla)
+	doDiego := h.newTeam("Squad Aurora", diego)
+
+	// Carla também gere o time do Diego (como apoio), e o Diego é colaborador
+	// no time dela.
+	_, err := h.teams.AddMember(context.Background(), diego, doDiego.ID, carla.UserID, domain.TeamRoleGestorApoio)
+	requireNoError(t, err)
+	_, err = h.teams.AddMember(context.Background(), carla, daCarla.ID, diego.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	_, err = h.motivators.Save(context.Background(), diego, domain.MotivatorsCanonicos)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), carla, time.Now())
+	requireNoError(t, err)
+
+	// Diego gere um dos times somados: entrar pela porta do outro quebraria a
+	// separação entre quem observa e quem é observado.
+	if visao.TotalMembros != 0 {
+		t.Errorf("esperava nenhum observado, obtive %d: %+v", visao.TotalMembros, visao.Membros)
+	}
+	if visao.Responderam != 0 {
+		t.Errorf("a resposta de quem gere não pode contar, obtive %d", visao.Responderam)
+	}
+}
+
+func TestMotivatorsOverviewGeral_IgnoraTimeEmQueApenasParticipa(t *testing.T) {
+	h := newHarness(t)
+	carla := h.newUser("Carla", domain.RoleGestor)
+	outro := h.newUser("Diego", domain.RoleGestor)
+	bruno := h.newUser("Bruno", domain.RoleColaborador)
+
+	daCarla := h.newTeam("Squad Neon", carla)
+	doDiego := h.newTeam("Squad Aurora", outro)
+
+	// Carla é só colaboradora no time do Diego.
+	_, err := h.teams.AddMember(context.Background(), outro, doDiego.ID, carla.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+	_, err = h.teams.AddMember(context.Background(), outro, doDiego.ID, bruno.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), carla, time.Now())
+	requireNoError(t, err)
+
+	if len(visao.Times) != 1 || visao.Times[0].ID != daCarla.ID {
+		t.Errorf("esperava só o time que ela gere, obtive %+v", visao.Times)
+	}
+	// Bruno está no time do Diego: não pode aparecer no consolidado da Carla.
+	for _, membro := range visao.Membros {
+		if membro.UserID == bruno.UserID {
+			t.Error("membro de time alheio entrou no consolidado")
+		}
+	}
+}
+
+func TestMotivatorsOverviewGeral_IgnoraTimeArquivado(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	bruno := h.newUser("Bruno", domain.RoleColaborador)
+
+	ativo := h.newTeam("Squad Neon", gestor)
+	arquivado := h.newTeam("Squad Antigo", gestor)
+
+	_, err := h.teams.AddMember(context.Background(), gestor, arquivado.ID, bruno.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+	_, err = h.teams.Archive(context.Background(), gestor, arquivado.ID)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), gestor, time.Now())
+	requireNoError(t, err)
+
+	if len(visao.Times) != 1 || visao.Times[0].ID != ativo.ID {
+		t.Errorf("time arquivado não deveria entrar, obtive %+v", visao.Times)
+	}
+	if visao.TotalMembros != 0 {
+		t.Errorf("esperava nenhum membro, obtive %d", visao.TotalMembros)
+	}
+}
+
+func TestMotivatorsOverviewGeral_MarcaOTimeDeCadaPessoa(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	ana := h.newUser("Ana", domain.RoleColaborador)
+
+	time1 := h.newTeam("Squad Neon", gestor)
+	_, err := h.teams.AddMember(context.Background(), gestor, time1.ID, ana.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), gestor, time.Now())
+	requireNoError(t, err)
+
+	// Sem o nome do time, a matriz consolidada não diz de onde cada pessoa veio.
+	if len(visao.Membros) != 1 || visao.Membros[0].NomeDoTime != "Squad Neon" {
+		t.Errorf("esperava a linha marcada com o time, obtive %+v", visao.Membros)
+	}
+}
+
+func TestMotivatorsOverviewGeral_AdminVeTodosOsTimesAtivos(t *testing.T) {
+	h := newHarness(t)
+	admin := h.newUser("Admin", domain.RoleAdmin)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+	bruno := h.newUser("Bruno", domain.RoleColaborador)
+
+	team := h.newTeam("Squad Neon", gestor)
+	_, err := h.teams.AddMember(context.Background(), gestor, team.ID, bruno.UserID, domain.TeamRoleColaborador)
+	requireNoError(t, err)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), admin, time.Now())
+	requireNoError(t, err)
+
+	if len(visao.Times) != 1 {
+		t.Errorf("o Admin deveria ver o time mesmo sem participar, obtive %d", len(visao.Times))
+	}
+	if visao.TotalMembros != 1 {
+		t.Errorf("esperava Bruno na conta, obtive %d", visao.TotalMembros)
+	}
+}
+
+func TestMotivatorsOverviewGeral_ColaboradorNaoTemAcesso(t *testing.T) {
+	h := newHarness(t)
+	colaborador := h.newUser("Bruno", domain.RoleColaborador)
+
+	_, err := h.teams.MotivatorsOverviewGeral(context.Background(), colaborador, time.Now())
+	requireCode(t, err, domain.CodeForbidden)
+}
+
+func TestMotivatorsOverviewGeral_GestorSemTimeRecebeVisaoVazia(t *testing.T) {
+	h := newHarness(t)
+	gestor := h.newUser("Carla", domain.RoleGestor)
+
+	visao, err := h.teams.MotivatorsOverviewGeral(context.Background(), gestor, time.Now())
+	requireNoError(t, err)
+
+	// Vazio não é erro: a tela mostra um estado explicando, como já faz quando
+	// o gestor não gere nenhum time.
+	if len(visao.Times) != 0 || visao.TotalMembros != 0 {
+		t.Errorf("esperava visão vazia, obtive %+v", visao)
+	}
+}

@@ -1,0 +1,22 @@
+{
+  "name": "synergy-e2e",
+  "version": "1.0.0",
+  "description": "Testes de ponta a ponta do Synergy (Playwright)",
+  "scripts": {
+    "test": "playwright test --project=api --project=web",
+    "test:api": "playwright test --project=api",
+    "test:web": "playwright test --project=web",
+    "test:residuo": "playwright test --project=web-com-residuo",
+    "test:ui": "playwright test --project=web --ui",
+    "test:headed": "playwright test --project=web --headed",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}

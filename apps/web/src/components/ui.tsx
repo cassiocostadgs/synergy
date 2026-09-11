@@ -170,7 +170,7 @@ export function Badge({
   )
 }
 
-/** Crachá circular com as iniciais (DESIGN-SYSTEM.md seção 4.5). */
+/** Crachá circular com as iniciais (DESIGN-SYSTEM.md seção 4.6). */
 export function Avatar({ name, tone = 'primary' }: { name: string; tone?: 'primary' | 'secondary' }) {
   const initials = name
     .split(' ')
@@ -290,16 +290,39 @@ export function PageHeader({
   title,
   subtitle,
   actions,
+  subtitleOptional = false,
 }: {
   title: string
   subtitle?: string
   actions?: ReactNode
+  /**
+   * Marca o subtítulo como dispensável: ele some em janela baixa (≤760px).
+   *
+   * O ganho não são só os 24px dele — é o elemento mais largo do bloco da
+   * esquerda, e sem ele as ações cabem na mesma linha do título em vez de
+   * quebrarem para uma linha própria, o que vale mais 80px. Num notebook
+   * 1280x800 com escala de 150%, a viewport tem ~440px e isso é um quarto dela.
+   *
+   * É opt-in porque em algumas telas o subtítulo carrega ESTADO, não
+   * explicação: em Brackets ele diz "2 confrontos a decidir" e "Disputa
+   * encerrada", que não aparecem em nenhum outro lugar.
+   */
+  subtitleOptional?: boolean
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-4 [@media(max-height:760px)]:mb-4">
       <div>
         <h1 className="font-display text-2xl font-bold tracking-tight text-content">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-content-muted">{subtitle}</p> : null}
+        {subtitle ? (
+          <p
+            className={cx(
+              'mt-1 text-sm text-content-muted',
+              subtitleOptional && '[@media(max-height:760px)]:hidden',
+            )}
+          >
+            {subtitle}
+          </p>
+        ) : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </header>

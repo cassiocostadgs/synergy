@@ -100,6 +100,12 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			protected.Route("/teams", func(teams chi.Router) {
 				teams.Get("/", teamHandler.List)
 
+				// Radar consolidado dos times que a pessoa gere. Segmento fixo,
+				// então o chi resolve antes de /{teamId} — não há ambiguidade
+				// com um time chamado "motivators".
+				teams.With(RequireRole(domain.RoleAdmin, domain.RoleGestor)).
+					Get("/motivators", teamHandler.MotivatorsGeral)
+
 				// Criar time exige papel global de Admin ou Gestor.
 				teams.With(RequireRole(domain.RoleAdmin, domain.RoleGestor)).
 					Post("/", teamHandler.Create)

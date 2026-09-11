@@ -118,7 +118,13 @@ export function AppShell() {
           ) : null}
         </header>
 
-        <main className="flex-1 px-4 pt-6 pb-28 sm:px-8 lg:pb-10">
+        {/*
+          O respiro inferior reserva espaço para a BottomNavBar flutuante, que
+          passa por cima do conteúdo. Em janela baixa ele encolhe para o mínimo
+          que a barra ocupa (altura + o `bottom-4` dela): 28 dá folga que ali
+          custa caro. O topo também aperta um pouco.
+        */}
+        <main className="flex-1 px-4 pt-6 pb-28 sm:px-8 lg:pb-10 [@media(max-height:760px)]:pt-4 max-lg:[@media(max-height:760px)]:pb-24">
           <Outlet />
         </main>
       </div>

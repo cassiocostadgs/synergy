@@ -19,7 +19,7 @@ synergy/
 │   │       ├── auth/         # Detalhes técnicos de autenticação (bcrypt, JWT)
 │   │       └── config/       # Leitura e validação das variáveis de ambiente
 │   │
-│   └── web/                  # Frontend em React (Vite + TypeScript)
+│   ├── web/                  # Frontend em React (Vite + TypeScript)
 │       └── src/
 │           ├── app/          # App Shell (navegação) e guards de rota
 │           ├── components/   # Componentes de UI genéricos (Design System)
@@ -30,6 +30,13 @@ synergy/
 │           ├── hooks/        # Hooks genéricos reutilizáveis entre features
 │           ├── services/     # Cliente HTTP global (fetch + envelope da API)
 │           └── types/        # Tipos TypeScript compartilhados
+│   │
+│   └── e2e/                  # Testes de ponta a ponta (Playwright)
+│       ├── src/              # Cliente da API, sessão e localizadores de tela
+│       └── tests/
+│           ├── api/          # Contrato e RBAC direto na API (sem navegador)
+│           └── web/          # Fluxos de interface
+│               └── com-residuo/  # Opt-in: cria registro no banco
 ├── PRD.md                    # Requisitos de produto
 ├── DESIGN-SYSTEM.md          # Design System "Neon Tokyo"
 ├── tasks.md                  # Backlog do MVP e status de implementação

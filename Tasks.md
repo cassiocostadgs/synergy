@@ -337,11 +337,132 @@ backend), **login por senha mantido para todos** como rede de segurança, e **v�
 
 ---
 
+## Fase 4.6 — Testes de ponta a ponta (`apps/e2e`)
+
+Camada em **Playwright**, em pasta própria no mesmo nível de `api` e `web`: ela não pertence
+a nenhum dos dois, e sim à integração entre eles. Roda contra API, front e PostgreSQL de
+verdade.
+
+- [x] `apps/e2e/` com três projetos: `api` (contrato/RBAC sem navegador), `web` (interface) e
+      `web-com-residuo` (opt-in)
+- [x] **60 testes** na suíte padrão (27 de API + 33 de interface) + 3 na opt-in
+- [x] **A suíte padrão não altera o banco** — dá para rodar com o app aberto sem sujar dado de
+      demonstração. Só a opt-in cria registro, porque a API não tem DELETE de time
+- [x] Cenário preparado pela API, não pela tela: um teste de Radar não quebra porque o
+      formulário de criar time mudou
+- [x] Nada de nome de time ou membro fixo no código — os testes descobrem pela API quem gere
+      o quê e quem respondeu
+- [x] Sobe API e front sozinho quando não estão no ar (`webServer` com `reuseExistingServer`)
+- [x] Usa o **Chrome instalado** em vez do Chromium do Playwright: o download do CDN não
+      completa na rede da DB1 (timeout no ZIP)
+- [x] Cobertura: login e sessão (incluindo "manter sessão" em sessionStorage), RBAC por
+      papel, Radar (seletor de times geridos, gestor fora da matriz, filtro + sobreposição),
+      Sorteio, Brackets (regressão do campeão prematuro), perfil e Moving Motivators
+- [x] Invariantes do Radar pela API: soma de Borda = 55, cobertura consistente, 10 posições
+      sem repetição, e a série individual do cliente reproduzindo o score do servidor
+
+### O que a suíte pegou
+
+- **Nada de errado no produto.** As 4 rodadas de falha foram todas defeito de teste meu:
+  nome acessível do bloco de perfil, ícone entrando no `innerText` do menu, `addInitScript`
+  reinjetando o token depois do logout, e um teste que promovia a Gestor de Apoio alguém com
+  papel global de Colaborador — a API recusou corretamente, com a mensagem certa
+- [x] Essa recusa virou teste: promover Colaborador global a Gestor de Apoio mostra o motivo
+      na tela
+
+### Pendências
+
+- [ ] Rodar na CI (hoje é local; a CI precisaria de PostgreSQL e de um banco só dela)
+- [ ] Banco de teste isolado — exigiria `ALTER ROLE synergy CREATEDB`, que hoje o usuário da
+      aplicação não tem. Com ele, a suíte opt-in deixaria de ter resíduo
+
+---
+
+## Fase 4.7 — Radar consolidado e tela sem rolagem (PRD seção 3.2.4)
+
+### Todos os meus times, somados
+
+- [x] `GET /api/v1/teams/motivators` — Radar consolidado dos times que a pessoa gere
+      (todos os ativos, para o Admin); primeira opção do seletor de time
+- [x] **A soma é do servidor**, não do cliente: a contagem de Borda já vive no domínio, e
+      refazê-la no front criaria duas fórmulas para divergirem na primeira mudança
+- [x] **Cada pessoa conta uma vez** mesmo estando em dois times somados — senão a resposta
+      dela pesaria o dobro da de um colega
+- [x] **Quem gere qualquer um dos times fica de fora**, mesmo sendo colaborador em outro:
+      no conjunto, a separação entre quem observa e quem é observado precisa valer no conjunto
+- [x] Cada linha da matriz passa a mostrar o time da pessoa no lugar do papel
+- [x] `radarDeMembros` extraído: as duas visões divergem só em quem entra na conta; daí para
+      frente é o mesmo código
+- [x] **10 testes unitários** novos (total do backend: **141**) + **6 de API** e **3 de
+      interface** no `apps/e2e` (total: **69**)
+
+### Tela sem rolagem
+
+- [x] O conteúdo do Radar é uma coluna de altura de viewport; o mapa de calor rola por dentro
+- [x] **Só `8rem` é subtraído** — cabeçalho do app e respiros do `main`, as únicas partes
+      de altura fixa. O título NÃO entra na conta: com os filtros ao lado ele ocupa uma linha
+      em tela larga e duas em tela estreita, e um valor fixo erraria em uma das duas
+- [x] O gráfico tem teto de altura em `svh`: sendo SVG com proporção intrínseca, ele encolhe
+      inteiro e continua centrado, sem cortar rótulo
+- [x] Faixa de pendências com teto e rolagem própria, para uma lista grande não empurrar o resto
+- [x] Medido em 6 resoluções (1024×700 a 1920×1040): **zero rolagem** em todas, com o gráfico
+      indo de 155px a 511px de altura
+- [x] Teste de interface que falha se a página voltar a rolar
+
+### Ajustes depois de ver a tela rodando
+
+- [x] **Célula do nome enxuta:** saíram o "(Colaborador)" — que se repetia em toda linha,
+      porque gestor não entra no Radar — e o ícone de revisão vencida, que dizia o mesmo que
+      o KPI "Revisões vencidas" e a faixa de atenção. Na visão consolidada fica o nome do time
+- [x] **Gráfico com piso de altura (`shrink-0` + 12rem):** era item de um flex e cedia espaço
+      para o botão e os destaques, chegando a **75px** numa janela de 620px. O gráfico é o
+      assunto da tela — quando não couber, quem rola é a página
+- [x] Coluna passou de `h` para `min-h`: ocupa a tela inteira, mas cresce quando o gráfico
+      exige, em vez de espremê-lo
+- [x] Subtítulo encurtado: com os filtros ao lado, o texto longo quebrava o cabeçalho em duas
+      linhas a partir de 1280px e comia 76px — exatamente o que faltava para caber
+- [x] Dois testes de regressão: gráfico com no mínimo 180px em janela de 620px, e a célula do
+      nome sem papel nem ícone
+
+### Segunda rodada: a tela do notebook
+
+O relato de "o mapa de calor ainda rola" veio de um **1280x800 com escala de 150%**, que dá
+ao navegador uma viewport de ~**853x440 px de CSS** — menor que a de um tablet. Nessa
+largura o layout nem entrava no breakpoint `lg`: empilhava tudo e a página rolava **846px**.
+
+- [x] Layout de duas colunas e orçamento de altura passaram de `lg` para **`md`** (768px)
+- [x] Desconto por breakpoint: `11rem` em md (a barra flutuante reserva 6rem embaixo) e
+      `8rem` em lg (a lateral dispensa essa reserva). Um valor só errava em um dos dois
+- [x] **Gráfico dimensionado pelo container, não por viewport:** `flex-1` com piso de 10rem
+      dentro do cartão. A conta por `svh` era frágil justamente porque o respiro do `main`
+      muda com o breakpoint
+- [x] Em janela baixa (≤760px) os três cartões de KPI viram **uma linha de texto** com os
+      mesmos números, os destaques e a nota do mapa somem, e o respiro do `main` encolhe
+- [x] `PageHeader` ganhou `subtitleOptional`: no Radar o subtítulo some em janela baixa, o
+      que faz os filtros voltarem para a linha do título (vale ~104px). **É opt-in porque em
+      Brackets o subtítulo carrega estado** ("Disputa encerrada") — a suíte pegou isso
+- [x] `min-h-fit` na coluna e `min-h-0` só no cartão que rola por dentro: sem isso o SVG
+      vazava para fora do cartão e os cartões passavam por cima da faixa de pendências
+
+**Rolagem medida depois desta rodada:** zero em 853x500, 1024x587, 1066x550, 1280x620,
+1280x720, 1366x768, 1440x900 e 1920x1040. No caso extremo do notebook (853x440) sobram
+18px na visão de um time e ~90px na consolidada, que tem a faixa de pendências a mais.
+
+> **Para quem usa 1280x800 com escala de 150%:** reduzir o zoom do navegador para 80% (ou a
+> escala do Windows para 125%) leva a viewport a ~1066x550, onde a tela cabe inteira com
+> folga. Não é contorno de bug — é que 440px de altura útil é menos do que um dashboard com
+> gráfico e matriz consegue ocupar.
+
+> **Menu não foi estreitado.** Chegou a ser oferecido, mas a largura da barra lateral não
+> compra altura — e era altura que faltava. O que resolveu foi o orçamento vertical acima.
+
+---
+
 ## Fase 5 — QA e Fechamento do MVP
 
 - [x] Verificação de ponta a ponta da API contra PostgreSQL real (login, RBAC, CRUD de time,
       RN1/RN2 e transferência de liderança) — executada manualmente via HTTP
-- [ ] Automatizar esses testes de integração (hoje só os unitários estão no `go test`)
+- [x] Automatizar esses testes de integração → entregue como `apps/e2e` (Fase 4.6)
 - [ ] Testes de componente das telas de `features/teams`
 - [ ] Revisão de acessibilidade e contraste
 - [x] Revisão de RBAC via API direta (403 para colaborador, 409 para violações de RN1)
