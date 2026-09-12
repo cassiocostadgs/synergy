@@ -37,6 +37,7 @@ synergy/
 │           ├── api/          # Contrato e RBAC direto na API (sem navegador)
 │           └── web/          # Fluxos de interface
 │               └── com-residuo/  # Opt-in: cria registro no banco
+├── docker-compose.yml        # Pilha completa: PostgreSQL + API + frontend
 ├── PRD.md                    # Requisitos de produto
 ├── DESIGN-SYSTEM.md          # Design System "Neon Tokyo"
 ├── tasks.md                  # Backlog do MVP e status de implementação

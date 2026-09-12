@@ -2,6 +2,7 @@
  * Componentes genéricos do Design System "Neon Tokyo" (DESIGN-SYSTEM.md seção 4).
  * Ficam aqui os blocos reutilizáveis por qualquer feature.
  */
+import { useEffect } from 'react'
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -336,10 +337,32 @@ export function Dialog({
   onClose,
   children,
 }: PropsWithChildren<{ open: boolean; title: string; onClose: () => void }>) {
+  // Esc fecha, como em qualquer modal. O efeito só existe enquanto o diálogo
+  // está aberto, senão cada tela com um diálogo fechado deixaria um listener
+  // de teclado pendurado no documento.
+  useEffect(() => {
+    if (!open) return
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', aoTeclar)
+    return () => document.removeEventListener('keydown', aoTeclar)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+    <div
+      // Clicar no fundo fecha; o clique de dentro do cartão não sobe até aqui
+      // por causa da checagem de alvo — sem ela, clicar num campo do formulário
+      // fecharia o diálogo.
+      onClick={(evento) => {
+        if (evento.target === evento.currentTarget) onClose()
+      }}
+      role="presentation"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+    >
       <Card className="w-full max-w-md p-6 shadow-glow-primary">
         <div className="mb-4 flex items-center justify-between gap-4">
           <h2 className="text-lg font-bold text-content">{title}</h2>

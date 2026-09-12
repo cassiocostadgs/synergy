@@ -453,8 +453,65 @@ largura o layout nem entrava no breakpoint `lg`: empilhava tudo e a página rola
 > folga. Não é contorno de bug — é que 440px de altura útil é menos do que um dashboard com
 > gráfico e matriz consegue ocupar.
 
+### Terceira rodada: guia de ajuda e a regressão da tela grande
+
+- [x] **Guia "Os 10 motivadores"** em `features/motivators/ui/AjudaDeMotivadores.tsx`: botão de
+      ajuda ao lado dos filtros, com sigla, nome, descrição e a explicação da escala. Vive em
+      `motivators` e não em `radar` porque descreve a prática — o perfil pode reusar
+- [x] `Dialog` ganhou **Esc** e clique no fundo para fechar, que faltavam em todos os diálogos
+- [x] **Corrigida regressão:** a visão consolidada voltou a rolar em 1920. O cartão do gráfico
+      tinha perdido o `min-h-0` (para parar um vazamento anterior), e **um SVG reivindica como
+      altura mínima a que a própria proporção pede** — isso travava a linha inteira, que não
+      conseguia devolver espaço quando a faixa de pendências aparecia
+- [x] Modelo final: a linha e o cartão do gráfico podem encolher (`min-h-0`); quem garante que
+      o gráfico não some é o **wrapper com piso de altura**, que cede em degraus conforme a
+      janela encurta (10rem → 6rem abaixo de 560px → 5rem abaixo de 480px)
+- [x] Os degraus usam faixas que **não se sobrepõem** (`min-height` + `max-height`): com dois
+      media queries casando ao mesmo tempo, quem vence depende da ordem que o Tailwind gera —
+      e o piso menor nunca aplicava
+- [x] Medido nas **duas visões** (um time e consolidada) em 10 resoluções, de 853x440 a
+      1920x1040: **rolagem zero em todas**, e o gráfico dentro do cartão em todas
+- [x] Dois testes novos: a consolidada não rola em 1920x945, e a ajuda lista os dez e fecha
+      com Esc
+
+> **Lição para a próxima tela densa:** `min-h-0` não é detalhe de ajuste fino. Ele decide
+> quem pode ceder espaço, e um elemento com proporção intrínseca (SVG, imagem, vídeo) sem ele
+> trava a cadeia inteira de flex acima dele.
+
 > **Menu não foi estreitado.** Chegou a ser oferecido, mas a largura da barra lateral não
 > compra altura — e era altura que faltava. O que resolveu foi o orçamento vertical acima.
+
+---
+
+## Fase 4.8 — Empacotamento em Docker
+
+- [x] `apps/api/Dockerfile` — dois estágios; binário estático (`CGO_ENABLED=0`), imagem
+      final Alpine com usuário não-root e healthcheck em `/health`
+- [x] `ca-certificates` na imagem da API **não é opcional**: a validação do token do Entra
+      baixa as chaves públicas por HTTPS, e sem os certificados o SSO falharia com 500
+- [x] `apps/web/Dockerfile` — build com Node, entrega com nginx; a imagem final não tem
+      Node, node_modules nem código-fonte
+- [x] `apps/web/nginx.conf` — fallback de SPA, cache longo nos assets com hash e
+      `no-cache` no `index.html`, e proxy de `/api` para a API
+- [x] Proxy com `resolver 127.0.0.11` e `proxy_pass $variavel$request_uri`: sem o resolver
+      o nginx fixaria o IP da API na subida; com variável, ele não repassa a URI sozinho
+- [x] `docker-compose.yml` — PostgreSQL com volume nomeado, seed idempotente, API e front
+- [x] **Só o front expõe porta.** Banco e API ficam na rede interna do compose
+- [x] Ordem na primeira subida: o seed roda as migrations e sai; a API só parte depois
+      (`service_completed_successfully`), evitando duas migrations concorrentes
+- [x] O compose **aborta** sem `POSTGRES_PASSWORD`, `JWT_SECRET` e `SEED_ADMIN_PASSWORD`
+      (sintaxe `${VAR:?mensagem}`) — endereça a preocupação com senha padrão registrada
+      na conversa sobre credenciais
+- [x] `.dockerignore` nos dois apps, barrando `.env` e `node_modules` do contexto
+
+### Pendências
+
+- [ ] **Build nunca executado:** não há Docker instalado na máquina de desenvolvimento. O
+      YAML foi validado por parser e os caminhos conferidos, mas `docker compose up` ainda
+      não rodou nenhuma vez
+- [ ] Imagem da API não tem `HEALTHCHECK` alternativo para bases sem shell — hoje depende
+      do `wget` do BusyBox
+- [ ] Publicação das imagens num registry e pipeline de CI
 
 ---
 

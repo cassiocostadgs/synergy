@@ -1,0 +1,93 @@
+# Synergy — pilha completa: PostgreSQL + API + frontend.
+#
+#   cp .env.example .env     # e preencha as senhas
+#   docker compose up --build
+#   http://localhost:8080
+#
+# Só o frontend expõe porta. O banco e a API conversam pela rede interna do
+# compose, o que é o equivalente ao `listen_addresses = localhost` que usamos no
+# ambiente de desenvolvimento.
+
+name: synergy
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: synergy
+      POSTGRES_USER: synergy
+      # O `:?` faz o compose ABORTAR se a variável não existir. É de propósito:
+      # senha padrão que ninguém troca é como a maioria dos vazamentos começa.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+    volumes:
+      # Volume nomeado: os dados sobrevivem a `docker compose down`. Só sai com
+      # `down -v`, que apaga tudo.
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` responde antes de o banco aceitar conexões de verdade em
+      # alguns casos, então checamos com uma consulta real.
+      test: ["CMD-SHELL", "pg_isready -U synergy -d synergy -q && psql -U synergy -d synergy -c 'SELECT 1' > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  # Cria o Admin inicial e sai. É idempotente: se o admin já existe, não faz
+  # nada. Roda a cada `up` justamente por isso — não há passo manual a lembrar.
+  seed:
+    image: synergy-api:local
+    build: ./apps/api
+    entrypoint: ["/app/seed"]
+    environment:
+      DATABASE_URL: postgres://synergy:${POSTGRES_PASSWORD}@postgres:5432/synergy?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Admin Synergy}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@synergy.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?defina SEED_ADMIN_PASSWORD no arquivo .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: synergy-api:local
+    build: ./apps/api
+    environment:
+      DATABASE_URL: postgres://synergy:${POSTGRES_PASSWORD}@postgres:5432/synergy?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
+      JWT_TTL_HOURS: ${JWT_TTL_HOURS:-8}
+      API_PORT: "8080"
+      # Vazio de propósito: o front é servido pela mesma origem (o nginx faz o
+      # proxy de /api), então não há requisição entre origens para liberar.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      # SSO da Microsoft (opcional). Sem as duas, a API sobe só com senha.
+      MS_TENANT_ID: ${MS_TENANT_ID:-}
+      MS_CLIENT_ID: ${MS_CLIENT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        # Vazia = mesma origem. Trocar por uma URL externa exige configurar
+        # CORS_ALLOWED_ORIGINS na API.
+        VITE_API_URL: ""
+        # Precisam ser os MESMOS valores da API: o token é emitido para aquele
+        # client id, e a API recusa token emitido para outro aplicativo.
+        VITE_MS_TENANT_ID: ${MS_TENANT_ID:-}
+        VITE_MS_CLIENT_ID: ${MS_CLIENT_ID:-}
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

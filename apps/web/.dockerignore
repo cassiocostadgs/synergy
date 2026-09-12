@@ -1,0 +1,13 @@
+# node_modules fica de fora porque o build roda `npm ci` dentro da imagem —
+# copiar os módulos do Windows para dentro do Linux quebraria binários nativos.
+node_modules/
+dist/
+
+# As variáveis do Vite chegam por ARG no build; um .env local aqui dentro teria
+# precedência e poderia apontar o front para o localhost da sua máquina.
+.env
+.env.*
+!.env.example
+
+playwright-report/
+test-results/

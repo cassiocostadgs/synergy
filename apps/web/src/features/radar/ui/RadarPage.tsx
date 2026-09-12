@@ -13,6 +13,7 @@ import {
 } from '@/components/ui'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { MOTIVATOR_INFO } from '@/features/motivators/motivators'
+import { AjudaDeMotivadores } from '@/features/motivators/ui/AjudaDeMotivadores'
 import { radarApi, type MotivatorScore, type RadarBase } from '@/features/radar/api/radarApi'
 import { GraficoRadar } from '@/features/radar/ui/GraficoRadar'
 import { MapaDeCalor } from '@/features/radar/ui/MapaDeCalor'
@@ -128,6 +129,12 @@ export function RadarPage() {
         actions={
           ativos.length > 0 ? (
             <div className="flex flex-wrap items-end gap-3">
+              {/*
+                Primeiro da linha, antes dos filtros: é o que explica os rótulos
+                do gráfico e as siglas das colunas da matriz, então vem antes de
+                qualquer coisa que recorte o dado.
+              */}
+              <AjudaDeMotivadores />
               {ativos.length > 1 ? (
                 <div className="min-w-56">
                   <Select
@@ -356,14 +363,14 @@ function ConteudoDoRadar({
         abaixo do que os cartões precisam. Com `min-h-0` ela cedia e os cartões
         passavam por cima da faixa de pendências numa janela baixa.
       */}
-      <div className="grid gap-3 md:flex-1 md:grid-cols-2">
+      <div className="grid gap-3 md:min-h-0 md:flex-1 md:grid-cols-2">
         {/*
           Sem `min-h-0` de propósito, ao contrário do cartão ao lado: o mapa de
           calor PODE encolher abaixo do conteúdo, porque rola por dentro; o
           gráfico não pode — autorizar isso era o que fazia o SVG vazar para
           fora do cartão numa janela baixa.
         */}
-        <Card className="flex flex-col justify-center p-4">
+        <Card className="flex min-h-0 flex-col justify-center p-4">
           {/*
             O gráfico se ajusta ao espaço do cartão, não a uma conta de
             viewport: `flex-1` faz ele ocupar a sobra, e o piso de 10rem impede
@@ -374,7 +381,7 @@ function ConteudoDoRadar({
             muda com o breakpoint (96px quando a barra flutuante existe, 40px
             quando a lateral aparece): a mesma conta errava em um dos dois.
           */}
-          <div className="flex min-h-40 flex-1 items-center justify-center">
+          <div className="flex min-h-40 flex-1 items-center justify-center [@media(min-height:481px)_and_(max-height:560px)]:min-h-24 [@media(max-height:480px)]:min-h-20">
             <GraficoRadar
               scores={data.scores}
               individual={serieIndividual}

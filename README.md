@@ -281,6 +281,66 @@ porque a API não tem `DELETE` de time. Detalhes em `apps/e2e/README.md`.
 
 ---
 
+## 7. Docker
+
+A pilha inteira — PostgreSQL, API e frontend — sobe com um comando. É o caminho
+mais curto para rodar em outra máquina sem instalar Go, Node nem PostgreSQL, e
+também contorna a restrição de antivírus do Windows: o binário é Linux e nasce
+dentro do container.
+
+```bash
+cp .env.example .env     # preencha as três senhas
+docker compose up --build
+# http://localhost:8080
+```
+
+O compose **recusa subir** sem `POSTGRES_PASSWORD`, `JWT_SECRET` e
+`SEED_ADMIN_PASSWORD`. É deliberado: valor padrão que ninguém troca é como a
+maior parte dos vazamentos começa.
+
+### O que sobe
+
+| Serviço | Papel | Porta no host |
+| :--- | :--- | :--- |
+| `postgres` | banco, em volume nomeado (sobrevive a `down`, sai com `down -v`) | nenhuma |
+| `seed` | cria o Admin inicial e sai; idempotente, roda a cada `up` | — |
+| `api` | binário Go estático, usuário não-root | nenhuma |
+| `web` | `dist` do Vite servido por nginx, com proxy de `/api` | `WEB_PORT` (8080) |
+
+**Só o frontend expõe porta.** A API e o banco conversam pela rede interna do
+compose — o equivalente ao `listen_addresses = localhost` do ambiente local.
+
+### Duas decisões que explicam o resto
+
+**Front e API na mesma origem.** O nginx da imagem `web` encaminha `/api` para a
+API, então o navegador vê tudo como um site só e **não há CORS para configurar**.
+É por isso que `VITE_API_URL` vai vazia no build.
+
+**A ordem importa na primeira subida.** `seed` e `api` aplicam migrations, e
+rodá-las ao mesmo tempo seria uma corrida. Por isso a API só parte depois que o
+seed termina com sucesso, e o front só depois que a API responde ao healthcheck.
+
+### SSO da Microsoft no Docker
+
+Preencha `MS_TENANT_ID` e `MS_CLIENT_ID` no `.env`: eles chegam à API como
+variável de ambiente e ao front como argumento de build. Acrescente
+`http://localhost:8080` aos redirect URIs do app registration.
+
+Lembre que **as variáveis do Vite são resolvidas no build**: mudar o `.env`
+depois exige `docker compose up --build web`, não um simples restart.
+
+### Comandos do dia a dia
+
+```bash
+docker compose logs -f api          # acompanhar a API
+docker compose up --build web       # rebuildar só o front (após mudar VITE_*)
+docker compose down                 # parar, preservando o banco
+docker compose down -v              # parar e APAGAR o banco
+docker compose exec postgres psql -U synergy -d synergy   # abrir o psql
+```
+
+---
+
 ## Arquitetura
 
 ### Backend — camadas (dependências sempre para dentro)

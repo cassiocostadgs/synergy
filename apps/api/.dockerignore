@@ -1,0 +1,12 @@
+# Quanto menor o contexto, mais rápido o build — e menos chance de um segredo
+# local entrar na imagem por descuido.
+.env
+.env.*
+!.env.example
+
+# Scripts de desenvolvimento do Windows: não têm uso dentro do container.
+scripts/
+
+# Artefatos de build local.
+bin/
+*.exe

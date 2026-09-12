@@ -190,3 +190,60 @@ test('o mapa de calor mostra só o nome na visão de um time', async ({ page }) 
   await expect(matriz.getByText('(Colaborador)')).toHaveCount(0)
   await expect(matriz.getByText('revisão vencida')).toHaveCount(0)
 })
+
+test('a visão consolidada também cabe em tela grande', async ({ page }) => {
+  // Regressão relatada: em 1920 a tela voltou a rolar na visão consolidada, que
+  // tem mais linhas e a faixa de pendências. A causa foi o cartão do gráfico ter
+  // deixado de poder encolher — o SVG reivindica a altura da própria proporção
+  // como mínimo, e sem `min-h-0` isso trava a linha inteira.
+  await page.setViewportSize({ width: 1920, height: 945 })
+  await entrarComo(page, USUARIOS.gestora, '/radar')
+
+  const consolidado = await api.radarConsolidado(await autenticar(USUARIOS.gestora))
+  test.skip(consolidado.teams.length < 2, 'a gestora gere menos de dois times')
+
+  await filtroDeTime(page).selectOption({
+    label: `Todos os meus times (${consolidado.teams.length})`,
+  })
+  await page.getByRole('table').waitFor()
+
+  const medidas = await page.evaluate(() => {
+    const svg = document.querySelector('[aria-label*="adar dos motivadores"]')
+    const cartao = svg?.closest('.rounded-2xl')
+    return {
+      rola: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      // Positivo = o gráfico ultrapassou a borda do cartão.
+      vaza: Math.round(
+        (svg?.getBoundingClientRect().bottom ?? 0) - (cartao?.getBoundingClientRect().bottom ?? 0),
+      ),
+    }
+  })
+
+  expect(medidas.rola).toBeLessThanOrEqual(2)
+  expect(medidas.vaza).toBeLessThanOrEqual(2)
+})
+
+test('a ajuda explica o que é cada motivador', async ({ page }) => {
+  await entrarComo(page, USUARIOS.gestora, '/radar')
+
+  await page.getByRole('button', { name: 'O que significa cada motivador' }).click()
+
+  const dialogo = page.getByText('Os 10 motivadores').locator('..').locator('..')
+  await expect(dialogo).toBeVisible()
+
+  // Os dez, com nome e sigla — é a sigla que decodifica as colunas da matriz.
+  for (const [sigla, nome] of [
+    ['CUR', 'Curiosidade'],
+    ['LIB', 'Liberdade'],
+    ['MAE', 'Maestria'],
+    ['STA', 'Status'],
+  ]) {
+    await expect(dialogo.getByText(sigla, { exact: true })).toBeVisible()
+    await expect(dialogo.getByText(new RegExp(`^${nome}:`))).toBeVisible()
+  }
+  await expect(dialogo.getByRole('listitem')).toHaveCount(10)
+
+  // Esc fecha, como em qualquer modal.
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('Os 10 motivadores')).toHaveCount(0)
+})

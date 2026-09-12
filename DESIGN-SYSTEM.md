@@ -93,6 +93,8 @@ Padrão usado no Radar, aplicável a qualquer tela densa.
 - **`min-h-0` só em quem rola por dentro.** É ele que autoriza um item flex a encolher abaixo do próprio conteúdo. No cartão que tem rolagem interna (uma tabela), é o que faz a rolagem funcionar; em qualquer outro, é o que faz o conteúdo vazar.
 - **Gráfico se ajusta ao container, não ao viewport:** `flex-1` com piso de altura, dentro de um cartão de altura conhecida. Sendo SVG com razão intrínseca, ele encolhe inteiro e continua centrado. Conta por `svh` em elemento aninhado é frágil — ela ignora tudo que está entre o viewport e ele.
 - **Abaixo de 760px de altura, o enfeite sai:** cartões de KPI viram uma linha de texto com os mesmos números, notas explicativas e destaques redundantes somem, e os respiros encolhem. Num notebook 1280x800 com escala de 150% a viewport tem ~440px — três cartões de KPI custariam um quarto dela.
+- **`min-h-0` decide quem cede espaço.** Um elemento com proporção intrínseca (SVG, imagem, vídeo) reivindica como altura mínima a que a proporção pede — sem `min-h-0` no ancestral flex, isso trava a cadeia inteira e a página rola. O piso de tamanho deve morar num wrapper com `min-height` explícito, não na impossibilidade de encolher.
+- **Degraus de piso usam faixas que não se sobrepõem** (`min-height` + `max-height` no mesmo media query). Com dois media queries casando ao mesmo tempo, quem vence depende da ordem que o Tailwind gera — e o degrau menor nunca aplica.
 - **Subtítulo só some se for explicação.** `PageHeader` tem `subtitleOptional` justamente porque em algumas telas ele carrega **estado** (em Brackets, "Disputa encerrada"). Esconder por altura o que não aparece em outro lugar é perder informação, não ganhar espaço.
 
 ### 4.5. Tela de Login
