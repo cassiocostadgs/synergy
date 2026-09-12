@@ -81,7 +81,12 @@ func run(logger *slog.Logger) error {
 		Sessions:       authUC,
 		Logger:         logger,
 		AllowedOrigins: cfg.AllowedOrigins,
+		StaticDir:      cfg.StaticDir,
 	})
+
+	if cfg.StaticDir != "" {
+		logger.Info("servindo o frontend", slog.String("diretorio", cfg.StaticDir))
+	}
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

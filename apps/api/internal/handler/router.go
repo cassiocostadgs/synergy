@@ -19,6 +19,10 @@ type RouterConfig struct {
 	Sessions       SessionValidator
 	Logger         *slog.Logger
 	AllowedOrigins []string
+	// StaticDir, quando preenchido, faz a API também servir o frontend a partir
+	// desse diretório. É o modo de container único, em que não há nginx na
+	// frente. Vazio em desenvolvimento: lá quem serve o front é o Vite.
+	StaticDir string
 }
 
 // NewRouter monta o roteador HTTP da API.
@@ -32,12 +36,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	router.Use(RequestLogger(cfg.Logger))
 	router.Use(CORS(cfg.AllowedOrigins))
 
-	// Respostas de rota/método inválidos também seguem o envelope da API — sem
-	// isso o chi devolveria texto puro no 404 e corpo vazio no 405, quebrando o
+	// Respostas de rota/método inválidos seguem o envelope da API — sem isso o
+	// chi devolveria texto puro no 404 e corpo vazio no 405, quebrando o
 	// contrato que o frontend espera.
-	router.NotFound(func(w http.ResponseWriter, _ *http.Request) {
-		respondError(w, domain.NotFound("rota não encontrada"))
-	})
 	router.MethodNotAllowed(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, envelope{
 			Error: &errorBody{
@@ -47,17 +48,31 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		})
 	})
 
-	// Raiz apenas identifica o serviço: quem abre a URL da API no navegador
-	// recebe uma resposta útil em vez de um 404 sem explicação.
-	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
-		respond(w, http.StatusOK, map[string]any{
-			"service": "Synergy API",
-			"endpoints": map[string]string{
-				"health": "/health",
-				"api":    "/api/v1",
-			},
+	if cfg.StaticDir == "" {
+		router.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+			respondError(w, domain.NotFound("rota não encontrada"))
 		})
-	})
+
+		// Sem frontend embarcado, a raiz identifica o serviço: quem abre a URL da
+		// API no navegador recebe uma resposta útil em vez de um 404 sem explicação.
+		router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
+			respond(w, http.StatusOK, map[string]any{
+				"service": "Synergy API",
+				"endpoints": map[string]string{
+					"health": "/health",
+					"api":    "/api/v1",
+				},
+			})
+		})
+	} else {
+		// Com o frontend embarcado, tudo que não é rota conhecida vira tentativa
+		// de servir arquivo — e, no fim, o index.html. O handler devolve o
+		// envelope de erro para caminhos sob /api/, que são engano de chamada e
+		// não navegação.
+		estaticos := spaHandler(cfg.StaticDir)
+		router.NotFound(estaticos)
+		router.Get("/", estaticos)
+	}
 
 	router.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		respond(w, http.StatusOK, map[string]string{"status": "ok"})

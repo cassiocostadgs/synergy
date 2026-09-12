@@ -23,6 +23,9 @@ type Config struct {
 	// bundle que o navegador baixa.
 	MicrosoftTenantID string
 	MicrosoftClientID string
+	// StaticDir liga a entrega do frontend pela própria API, no modo de
+	// container único. Vazio em desenvolvimento, onde quem serve o front é o Vite.
+	StaticDir string
 }
 
 // MicrosoftSSOHabilitado indica se o ambiente tem SSO configurado.
@@ -33,13 +36,17 @@ func (c *Config) MicrosoftSSOHabilitado() bool {
 // Load lê a configuração do ambiente e valida o que é obrigatório.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Port:              env("API_PORT", "8080"),
+		// PORT é a convenção das plataformas de hospedagem, que escolhem a porta
+		// e a injetam no container. API_PORT tem precedência para não mudar o
+		// comportamento de quem já a define.
+		Port:              env("API_PORT", env("PORT", "8080")),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
 		JWTTTL:            time.Duration(envInt("JWT_TTL_HOURS", 8)) * time.Hour,
 		AllowedOrigins:    strings.Split(env("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		MicrosoftTenantID: strings.TrimSpace(os.Getenv("MS_TENANT_ID")),
 		MicrosoftClientID: strings.TrimSpace(os.Getenv("MS_CLIENT_ID")),
+		StaticDir:         strings.TrimSpace(os.Getenv("STATIC_DIR")),
 	}
 
 	if cfg.DatabaseURL == "" {

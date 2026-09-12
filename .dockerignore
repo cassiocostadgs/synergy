@@ -1,0 +1,36 @@
+# Contexto do build da imagem única (Dockerfile da raiz).
+#
+# Vale também para o .zip que se envia à plataforma: quanto menos entra, menor o
+# upload e menor a chance de um segredo local viajar junto.
+
+# Dependências e artefatos — a imagem reinstala e recompila tudo.
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+bin/
+*.exe
+
+# Segredos e configuração local.
+.env
+.env.*
+!.env.example
+
+# Histórico e ferramentas.
+.git/
+.github/
+.vscode/
+.idea/
+.claude/
+
+# Testes de ponta a ponta não entram na imagem de produção.
+apps/e2e/
+**/playwright-report/
+**/test-results/
+
+# Scripts de desenvolvimento do Windows.
+apps/api/scripts/
+
+# Documentação.
+*.md
+!README.md

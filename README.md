@@ -298,6 +298,30 @@ O compose **recusa subir** sem `POSTGRES_PASSWORD`, `JWT_SECRET` e
 `SEED_ADMIN_PASSWORD`. É deliberado: valor padrão que ninguém troca é como a
 maior parte dos vazamentos começa.
 
+### Imagem única (plataformas que exigem Dockerfile na raiz)
+
+O `Dockerfile` **na raiz do repositório** existe para plataformas que recebem um
+`.zip`, constroem um Dockerfile na raiz e rodam **um container**. Ele junta as
+duas metades: o front é compilado com Node e a **própria API em Go o entrega**, na
+mesma porta em que atende `/api`. Sem nginx, um processo só.
+
+```bash
+docker build -t synergy .
+docker run -p 8080:8080   -e DATABASE_URL="postgres://usuario:senha@host:5432/synergy?sslmode=require"   -e JWT_SECRET="..."   -e SEED_ADMIN_PASSWORD="..."   synergy
+```
+
+| Variável | Obrigatória | Observação |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | **sim** | a imagem **não** traz PostgreSQL; o banco é externo |
+| `JWT_SECRET` | **sim** | a API recusa subir sem ele |
+| `SEED_ADMIN_PASSWORD` | na 1ª subida | cria o Admin inicial; sem ela o passo é pulado |
+| `PORT` ou `API_PORT` | não | a plataforma costuma injetar `PORT`; o padrão é 8080 |
+| `STATIC_DIR` | não | já vem apontada para `/app/web` na imagem |
+
+O `.zip` enviado à plataforma deve **excluir `node_modules`, `dist` e `.git`** — sem
+eles o pacote cai de dezenas de MB para poucos, e o build não aproveitaria nada
+disso de qualquer forma (a imagem reinstala e recompila tudo).
+
 ### O que sobe
 
 | Serviço | Papel | Porta no host |
