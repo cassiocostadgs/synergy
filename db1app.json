@@ -3,7 +3,7 @@
   "descricao": "Ferramenta interna de gestão de times e engajamento: cadastro de pessoas e times, Moving Motivators por colaborador e radar consolidado de motivadores para gestores. Autenticação por e-mail/senha ou SSO Microsoft (Entra ID).",
   "categoria": "operacao",
   "health_check_path": "/health",
-  "alcance": "pessoal",
+  "alcance": "time",
   "fatores": {
     "altera_outra_app": false,
     "expoe_api": false,

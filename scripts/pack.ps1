@@ -52,7 +52,18 @@ $arquivos = Get-ChildItem -Path $raiz -Recurse -File -Force | Where-Object {
     if ($_.Extension -eq '.exe') { return $false }
 
     # .env carrega segredo; .env.example é só referência e pode ir.
-    if ($_.Name -like '.env*' -and $_.Name -ne '.env.example') { return $false }
+    #
+    # Exceção: o .env DA RAIZ precisa viajar. Ele é o único canal de variáveis de
+    # ambiente do portal de deploy — não há tela para cadastrá-las, e é dele que
+    # a plataforma tira a configuração do container. Sem o arquivo no pacote a
+    # API recusa subir, o healthcheck falha e a publicação é desfeita.
+    #
+    # Os .env de apps/api e apps/web continuam de fora: são de desenvolvimento.
+    if ($_.Name -like '.env*' -and $_.Name -ne '.env.example') {
+        $ehEnvDaRaiz = ($_.Name -eq '.env') -and
+                       ([IO.Path]::GetDirectoryName($caminho) -eq $raiz.Path)
+        if (-not $ehEnvDaRaiz) { return $false }
+    }
 
     foreach ($padrao in $excluir) {
         if ($caminho -like "*$padrao*") { return $false }
