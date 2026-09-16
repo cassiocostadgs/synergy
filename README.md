@@ -318,6 +318,18 @@ docker run -p 8080:8080   -e DATABASE_URL="postgres://usuario:senha@host:5432/sy
 | `PORT` ou `API_PORT` | não | a plataforma costuma injetar `PORT`; o padrão é 8080 |
 | `STATIC_DIR` | não | já vem apontada para `/app/web` na imagem |
 
+#### ⚠️ `prisma/schema.prisma` não é código morto
+
+Há um `prisma/schema.prisma` na raiz com um `datasource` de cinco linhas. **A
+aplicação não o usa** — o schema real são as migrations SQL embutidas no binário
+Go. Ele existe porque a detecção automática do portal interno da DB1 hoje só
+reconhece projetos **Node com Prisma**: sem esse arquivo o portal não identifica
+que o app precisa de banco, não provisiona o PostgreSQL e não injeta
+`DATABASE_URL` — e o container sobe e morre com *"DATABASE_URL é obrigatória"*.
+
+Não apague achando que é sobra de outro projeto. Quando a detecção do portal
+passar a reconhecer monorepo Go, ele pode sair.
+
 O `.zip` enviado à plataforma deve **excluir `node_modules`, `dist` e `.git`** — sem
 eles o pacote cai de dezenas de MB para poucos, e o build não aproveitaria nada
 disso de qualquer forma (a imagem reinstala e recompila tudo).

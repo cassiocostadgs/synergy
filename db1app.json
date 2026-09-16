@@ -1,0 +1,17 @@
+{
+  "nome": "Synergy",
+  "descricao": "Ferramenta interna de gestão de times e engajamento: cadastro de pessoas e times, Moving Motivators por colaborador e radar consolidado de motivadores para gestores. Autenticação por e-mail/senha ou SSO Microsoft (Entra ID).",
+  "categoria": "operacao",
+  "health_check_path": "/health",
+  "alcance": "pessoal",
+  "fatores": {
+    "altera_outra_app": false,
+    "expoe_api": false,
+    "tem_llm": false,
+    "dado_sensivel": true,
+    "credencial_servico": false,
+    "sem_identidade": false
+  },
+  "declarado_por": "cassio.costa@db1.com.br",
+  "declarado_em": "2026-09-14"
+}

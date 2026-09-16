@@ -37,7 +37,9 @@ synergy/
 │           ├── api/          # Contrato e RBAC direto na API (sem navegador)
 │           └── web/          # Fluxos de interface
 │               └── com-residuo/  # Opt-in: cria registro no banco
+├── Dockerfile                # Imagem única (API servindo o front) para o portal interno
 ├── docker-compose.yml        # Pilha completa: PostgreSQL + API + frontend
+├── prisma/schema.prisma      # NÃO usado pela app — só faz o portal provisionar o banco
 ├── PRD.md                    # Requisitos de produto
 ├── DESIGN-SYSTEM.md          # Design System "Neon Tokyo"
 ├── tasks.md                  # Backlog do MVP e status de implementação

@@ -504,6 +504,23 @@ largura o layout nem entrava no breakpoint `lg`: empilhava tudo e a página rola
       na conversa sobre credenciais
 - [x] `.dockerignore` nos dois apps, barrando `.env` e `node_modules` do contexto
 
+### Publicação no portal interno (2026-09-14)
+
+- [x] `Dockerfile` **na raiz**: o portal recebe um `.zip`, constrói um Dockerfile na raiz e
+      roda **um container** — os Dockerfiles por app servem ao compose, não a ele
+- [x] Imagem única: o front é compilado com Node e a **própria API o entrega**, na mesma porta
+      em que atende `/api`. Um processo, sem nginx dentro do container
+- [x] `STATIC_DIR` liga essa entrega e fica **desligada por padrão** — em desenvolvimento quem
+      serve o front é o Vite, e a API não deve saber que existe um `dist` em algum lugar
+- [x] A API passou a aceitar `PORT`, convenção das plataformas que escolhem a porta
+- [x] **6 testes de unidade** do handler de estáticos (total do backend: **147**): fallback do
+      BrowserRouter, envelope JSON em `/api/` inexistente, cache dos assets e do index,
+      travessia de diretório e método inválido
+- [x] Verificado em execução sem Docker, com o binário e `STATIC_DIR` apontando para o `dist`
+- [x] `prisma/schema.prisma` na raiz — **não usado pela aplicação**. A detecção do portal só
+      reconhece projetos Node com Prisma; sem ele o banco não é provisionado, `DATABASE_URL`
+      não é injetada e o container morre na subida. Orientação do time da plataforma
+
 ### Pendências
 
 - [ ] **Build nunca executado:** não há Docker instalado na máquina de desenvolvimento. O
