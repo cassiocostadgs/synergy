@@ -1,0 +1,23 @@
+# Normalização de fim de linha.
+#
+# O ponto crítico são os .sh: eles entram numa imagem Linux e são executados
+# lá. Com CRLF, o kernel lê o shebang como "/bin/sh\r" e o container morre com
+# "no such file or directory" — mensagem que aponta para o script, não para o
+# fim de linha, e custa caro para diagnosticar.
+#
+# Sem este arquivo, o resultado depende do core.autocrlf de cada máquina, e o
+# projeto é desenvolvido no Windows.
+
+* text=auto
+
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+
+*.ps1       text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary

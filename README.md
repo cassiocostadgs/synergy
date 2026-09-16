@@ -24,6 +24,86 @@ seção 5.
 
 ---
 
+## Como rodar localmente
+
+Há dois caminhos. O de Docker não exige Go, Node nem PostgreSQL instalados e é o
+mais curto para só ver o produto de pé; o nativo é o que se usa para desenvolver,
+porque dá hot reload no front e rebuild rápido no back.
+
+### Caminho A — Docker (um comando)
+
+```bash
+cp .env.example .env     # preencha POSTGRES_PASSWORD, JWT_SECRET e SEED_ADMIN_PASSWORD
+docker compose up --build
+# http://localhost:8080
+```
+
+Sobe PostgreSQL, seed, API e frontend. O compose **recusa subir** sem aquelas três
+senhas — é deliberado. Detalhes, comandos do dia a dia e o que cada serviço faz
+estão na [seção 7](#7-docker).
+
+### Caminho B — nativo (desenvolvimento)
+
+Precisa de Go 1.27, Node 24 e PostgreSQL 17 na máquina (ver *Pré-requisitos*).
+
+**1. Banco** — uma vez só:
+
+```sql
+CREATE ROLE synergy LOGIN PASSWORD 'synergy';
+CREATE DATABASE synergy OWNER synergy;
+```
+
+As migrations são embutidas no binário e aplicadas sozinhas quando a API sobe.
+
+**2. API** (`apps/api`) — em um terminal:
+
+```powershell
+# Windows
+cd apps\api
+.\scripts\seed.ps1    # migrations + Admin inicial (idempotente)
+.\scripts\dev.ps1     # http://localhost:8080
+```
+
+```bash
+# Linux/macOS/WSL
+cd apps/api
+export DATABASE_URL="postgres://synergy:synergy@localhost:5432/synergy?sslmode=disable"
+export JWT_SECRET="dev-secret-synergy-mvp"
+export SEED_ADMIN_PASSWORD="synergy123"
+go run ./cmd/seed
+go run ./cmd/api
+```
+
+A API lê a configuração **direto das variáveis de ambiente** — não há loader de
+`.env` no projeto; o `apps/api/.env.example` é só referência.
+
+**3. Front** (`apps/web`) — em outro terminal:
+
+```bash
+cd apps/web
+cp .env.example .env    # VITE_API_URL=http://localhost:8080
+npm install
+npm run dev             # http://localhost:5173
+```
+
+**4. Entrar** — `admin@synergy.dev` com a senha usada no seed (padrão `synergy123`).
+
+### Verificando
+
+| Checagem | Esperado |
+| :--- | :--- |
+| `curl http://localhost:8080/health` | `{"data":{"status":"ok"}}` |
+| `http://localhost:5173` (ou `:8080` no Docker) | tela de login do Synergy |
+| Login com o usuário do seed | vai para a lista de Times |
+
+Se algo não subir, os casos comuns são: PostgreSQL parado ou credencial diferente
+do `DATABASE_URL`; `JWT_SECRET` ausente (a API recusa subir sem ele); só uma das
+duas variáveis `MS_*` definida (ver [seção 4.3](#43-quando-algo-não-funciona)); e,
+no Windows corporativo, o antivírus bloqueando binários novos — o que o item
+*Máquinas com antivírus corporativo restritivo*, logo abaixo, explica.
+
+---
+
 ## Pré-requisitos
 
 | Ferramenta | Versão usada |

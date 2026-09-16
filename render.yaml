@@ -1,0 +1,75 @@
+# Blueprint do Render — a API do Synergy.
+#
+# Só a API mora aqui. O frontend vai para a Vercel (apps/web/vercel.json) e o
+# PostgreSQL para o Neon, cujo free tier não expira — o banco gratuito do
+# Render, sim.
+#
+# Para usar: Render > New > Blueprint > aponte para este repositório. Os
+# valores marcados com `sync: false` NÃO ficam no Git: o Render pergunta cada
+# um deles na criação.
+#
+# Ver DEPLOY.md para o passo a passo completo.
+
+services:
+  - type: web
+    name: synergy-api
+    runtime: docker
+
+    # Imagem só da API: o contexto é apps/api, então o build não copia nem
+    # compila o frontend. Quem entrega o front é a Vercel.
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+
+    plan: free
+    region: oregon
+
+    # O Render chama esta rota por HTTP para decidir se a versão nova subiu.
+    # A rota existe em apps/api/internal/handler/router.go.
+    healthCheckPath: /health
+
+    envVars:
+      # String de conexão do Neon. Use a variante COM `-pooler` no host e
+      # termine com `?sslmode=require&pool_max_conns=5`:
+      #   - sslmode=require porque o Neon recusa conexão sem TLS (o
+      #     `sslmode=disable` do .env.example vale só para o Postgres local);
+      #   - pool_max_conns porque o padrão do pgx é 4x o número de CPUs, o que
+      #     estoura o limite de conexões do plano gratuito.
+      - key: DATABASE_URL
+        sync: false
+
+      # Gerado uma vez pelo Render e guardado lá. Não fica no Git, e não é
+      # preciso inventar um valor. Trocá-lo depois invalida todas as sessões.
+      - key: JWT_SECRET
+        generateValue: true
+
+      # Senha do Admin inicial (mínimo de 8 caracteres). O entrypoint roda o
+      # seed antes da API; é idempotente, então só tem efeito no primeiro boot.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+
+      - key: SEED_ADMIN_EMAIL
+        value: admin@synergy.dev
+
+      - key: SEED_ADMIN_NAME
+        value: Admin Synergy
+
+      # A URL da Vercel, exata e com https. Fica pendente até o front existir:
+      # preencha depois do primeiro deploy lá. Sem ela o navegador bloqueia
+      # todas as chamadas, e o sintoma é tela de login que não responde.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+      - key: JWT_TTL_HOURS
+        value: "8"
+
+      # Vazio de propósito: aqui a API NÃO serve o frontend. Preenchê-la só
+      # faria sentido na imagem única do Dockerfile da raiz.
+      - key: STATIC_DIR
+        value: ""
+
+      # SSO da Microsoft (opcional). Ou preencha as duas com o GUID do Entra,
+      # ou deixe as duas vazias — o config.Load recusa subir pela metade.
+      - key: MS_TENANT_ID
+        value: ""
+      - key: MS_CLIENT_ID
+        value: ""

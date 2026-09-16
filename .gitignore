@@ -7,6 +7,13 @@ build/
 apps/api/bin/
 *.exe
 
+# Pacotes gerados por scripts/pack.ps1 para publicar no portal interno. São
+# artefatos: saem do código-fonte e não voltam para ele.
+*.zip
+
+# Saída do Vercel CLI (`vercel dev` / `vercel build`).
+.vercel/
+
 # Ambiente
 .env
 .env.local

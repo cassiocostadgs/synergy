@@ -50,7 +50,13 @@ FROM alpine:3.21
 
 # ca-certificates é obrigatório: a validação do token do SSO baixa as chaves
 # públicas do Entra por HTTPS. tzdata porque a base não traz fuso algum.
-RUN apk add --no-cache ca-certificates tzdata && \
+#
+# curl entra por exigência da plataforma, não do app: o Coolify confere a subida
+# do container novo chamando /health de dentro dele, e faz isso com curl. A base
+# alpine só traz o wget do busybox, que não serve para essa checagem — sem curl
+# a conferência não acontece, a plataforma entende que o container não respondeu
+# e desfaz o deploy. São ~5 MB que compram a publicação.
+RUN apk add --no-cache ca-certificates tzdata curl && \
     adduser --disabled-password --uid 10001 synergy
 
 WORKDIR /app
@@ -68,7 +74,9 @@ ENV STATIC_DIR=/app/web \
 
 EXPOSE 8080
 
+# Mesmo comando que a plataforma usa, para que o healthcheck do Docker e o da
+# plataforma não divirjam: se um passa, o outro passa.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
-  CMD wget --quiet --spider "http://127.0.0.1:${API_PORT:-8080}/health" || exit 1
+  CMD curl -fsS "http://127.0.0.1:${API_PORT:-8080}/health" > /dev/null || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
