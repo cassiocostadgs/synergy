@@ -65,6 +65,16 @@ COPY --from=web /web/dist ./web
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
+# A configuração do portal de deploy. Ele não injeta variável de ambiente no
+# container: o .env apenas viaja dentro do .zip, e cabe à imagem carregá-lo
+# (quem faz isso é o entrypoint). Sem ele a API recusa subir por falta de
+# JWT_SECRET, o healthcheck falha e a plataforma desfaz a publicação.
+#
+# O curinga é proposital: `COPY .env ./` falharia o build em quem clona o
+# repositório sem o arquivo. Como .env.example está sempre na raiz, o padrão
+# sempre casa com algo e o build nunca quebra por isso.
+COPY --chown=synergy:synergy .env* ./
+
 USER synergy
 
 # STATIC_DIR é o que liga a entrega do frontend pela API. Sem ela, a mesma

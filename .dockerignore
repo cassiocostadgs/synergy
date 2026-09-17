@@ -12,8 +12,18 @@ bin/
 *.exe
 
 # Segredos e configuração local.
-.env
-.env.*
+#
+# O .env DA RAIZ é a exceção e precisa entrar na imagem: o portal de deploy não
+# injeta variável de ambiente no container — ele só faz o arquivo viajar no
+# pacote. Quem o carrega é o docker-entrypoint.sh. Frameworks JS leem .env
+# sozinhos no build; um binário Go não, então sem esta exceção a API sobe sem
+# JWT_SECRET e a publicação é desfeita no healthcheck.
+#
+# Os .env de apps/api e apps/web continuam fora: são de desenvolvimento, e o de
+# apps/web faria o Vite embutir http://localhost:8080 como URL da API.
+**/.env
+**/.env.*
+!.env
 !.env.example
 
 # Histórico e ferramentas.

@@ -73,33 +73,40 @@ $arquivos = Get-ChildItem -Path $raiz -Recurse -File -Force | Where-Object {
 
 if (-not $arquivos) { throw 'nenhum arquivo selecionado — verifique a raiz do repositório' }
 
-# Monta em área temporária preservando a estrutura de pastas: o Compress-Archive
-# achataria tudo num nível só se recebesse a lista de arquivos direto.
-$temp = Join-Path ([IO.Path]::GetTempPath()) "synergy-pack-$(Get-Random)"
-New-Item -ItemType Directory -Path $temp -Force | Out-Null
+Write-Host '==> compactando' -ForegroundColor Cyan
 
+# Escreve o .zip pela API do .NET, entrada por entrada, em vez de usar o
+# Compress-Archive.
+#
+# O motivo é um defeito do Compress-Archive no PowerShell 5.1: ele grava os
+# caminhos com barra INVERTIDA (`apps\api\go.mod`). O formato ZIP exige barra
+# normal, e quem descompacta no Linux — a plataforma de deploy — não vê pastas:
+# vê um arquivo cujo nome tem barras invertidas dentro. O `COPY apps/api/...`
+# do Dockerfile então falha, e o build quebra sem mensagem que explique.
+#
+# Montar as entradas à mão também dispensa a cópia para uma área temporária,
+# que antes existia só para o Compress-Archive enxergar a estrutura de pastas.
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+if (Test-Path $saidaCompleta) { Remove-Item $saidaCompleta -Force }
+
+$zip = [IO.Compression.ZipFile]::Open($saidaCompleta, 'Create')
 try {
     foreach ($arquivo in $arquivos) {
         $relativo = $arquivo.FullName.Substring($raiz.Path.Length).TrimStart('\')
-        $destino = Join-Path $temp $relativo
-        $pastaDestino = Split-Path $destino -Parent
+        $entrada = $relativo -replace '\\', '/'
 
-        if (-not (Test-Path $pastaDestino)) {
-            New-Item -ItemType Directory -Path $pastaDestino -Force | Out-Null
-        }
-        Copy-Item $arquivo.FullName -Destination $destino
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $zip, $arquivo.FullName, $entrada,
+            [IO.Compression.CompressionLevel]::Optimal) | Out-Null
     }
-
-    Write-Host '==> compactando' -ForegroundColor Cyan
-
-    if (Test-Path $saidaCompleta) { Remove-Item $saidaCompleta -Force }
-    Compress-Archive -Path (Join-Path $temp '*') -DestinationPath $saidaCompleta -CompressionLevel Optimal
-
-    $tamanho = (Get-Item $saidaCompleta).Length / 1MB
-    Write-Host ''
-    Write-Host ("OK  {0}" -f $saidaCompleta) -ForegroundColor Green
-    Write-Host ("    {0} arquivos, {1:N1} MB" -f $arquivos.Count, $tamanho)
 }
 finally {
-    Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+    $zip.Dispose()
 }
+
+$tamanho = (Get-Item $saidaCompleta).Length / 1MB
+Write-Host ''
+Write-Host ("OK  {0}" -f $saidaCompleta) -ForegroundColor Green
+Write-Host ("    {0} arquivos, {1:N1} MB" -f $arquivos.Count, $tamanho)
